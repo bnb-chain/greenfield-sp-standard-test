@@ -136,8 +136,7 @@ func GenerateKey(r io.Reader) (*eddsa.PrivateKey, error) {
 
 	var bscalar big.Int
 	bscalar.SetBytes(scalar[:])
-	pub.A.ScalarMul(&c.Base, &bscalar)
-
+	pub.A.ScalarMultiplication(&c.Base, &bscalar)
 	var res [sizeFr * 3]byte
 	pubkBin := pub.A.Bytes()
 	subtle.ConstantTimeCopy(1, res[:sizeFr], pubkBin[:])

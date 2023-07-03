@@ -177,5 +177,5 @@ func (a *Account) IsObjectSealed(bucketName, objectName string) *storageTypes.Ob
 }
 
 func (a *Account) GetObject(bucketName, objectName string) (io.ReadCloser, sdkTypes.ObjectStat, error) {
-	return a.SDKClient.GetObject(a.Ctx, bucketName, objectName, sdkTypes.GetObjectOption{})
+	return a.SDKClient.GetObject(a.Ctx, bucketName, objectName, sdkTypes.GetObjectOptions{})
 }
