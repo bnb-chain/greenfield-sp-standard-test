@@ -1,0 +1,21 @@
+# this is greenfield testnet configuration
+GreenfieldEndpoint: https://gnfd-testnet-fullnode-tendermint-us.bnbchain.org:443
+GreenfieldChainId: greenfield_5600-1
+
+# private key: RootAcc  need have BNB balance
+# TODO: replace to yourself private key
+RootAcc:
+TestAcc:
+
+# TODO: replace to you want to test SP operator address
+SPOperatorAddr:
+# performance test params
+TPS: 2
+# Number of users. If the user.csv file does not exist or contains fewer accounts than the configured value, new account private keys will be automatically generated and saved in the user.csv file.
+NumUsers: 10
+# performance test duration(seconds)
+Duration: 60
+Upload: true
+Download: true
+# file size(bytes) random ~10kb(FileSize + random(10*1024))
+FileSize: 1024
