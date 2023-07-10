@@ -25,7 +25,7 @@ func (s *BaseSuite) SetupSuite() {
 		log.Errorf("Error getting account balance: %v", err)
 	}
 	log.Infof("rootAccountBalance: %v , root account : %s", rootAccountBalance.Amount, s.RootAcc.Addr.String())
-	if rootAccountBalance.Amount.Uint64() < 1e18 {
+	if rootAccountBalance.Amount.LT(math.NewInt(1e18)) {
 		log.Fatalf("rootAccount balance less 1BNB, need more BNB balance for test")
 	}
 
@@ -39,14 +39,14 @@ func (s *BaseSuite) SetupSuite() {
 	log.Infof("SP Endpoint: %s, address: %s", spInfo.Endpoint, spInfo.OperatorAddress)
 
 }
-func (s *BaseSuite) InitAccountsBNBBalance(accounts []*Account, amount uint64) {
+func (s *BaseSuite) InitAccountsBNBBalance(accounts []*Account, amount int64) {
 	for _, normalAccount := range accounts {
 		accountBalance, err := normalAccount.SDKClient.GetAccountBalance(context.Background(), normalAccount.Addr.String())
 		if err != nil {
 			log.Errorf("Error getting account balance: %v", err)
 		}
-		if accountBalance.Amount.Uint64() < amount {
-			transferTxHash, err := s.RootAcc.SDKClient.Transfer(context.Background(), normalAccount.Addr.String(), math.NewIntFromUint64(amount), types2.TxOption{})
+		if accountBalance.Amount.LT(math.NewInt(amount)) {
+			transferTxHash, err := s.RootAcc.SDKClient.Transfer(context.Background(), normalAccount.Addr.String(), math.NewInt(amount), types2.TxOption{})
 			if err != nil {
 				log.Errorf("root account Transfer err: %v", err)
 			}
