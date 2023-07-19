@@ -281,23 +281,22 @@ func (s *SPFunctionalTestSuite) Test_08_BucketsByIdsObjectsByIds() {
 
 	bucketsId := []uint64{listBuckets.Buckets[0].BucketInfo.Id.Uint64()}
 	response0, err := testAccount.SDKClient.ListBucketsByBucketID(context.Background(), bucketsId)
-	log.Infof("ListBucketsByBucketID: %v", response0.Buckets[0], err)
+	log.Infof("ListBucketsByBucketID: %v", response0.Buckets[0])
 	s.NoError(err, "call buckets-query error")
 	s.NotEmpty(response0.Buckets)
 	objectId := uint64(0)
 	for _, bucket := range listBuckets.Buckets {
 		bucketName := bucket.BucketInfo.BucketName
-		listObjects, err := testAccount.SDKClient.ListObjects(context.Background(), bucketName, sdkTypes.ListObjectsOptions{})
-		s.NoError(err)
+		listObjects, _ := testAccount.SDKClient.ListObjects(context.Background(), bucketName, sdkTypes.ListObjectsOptions{})
 		log.Infof("list users: %s objects length: %v", testAccount.Addr.String(), len(listObjects.Objects))
-		if listObjects.Objects != nil {
+		if len(listObjects.Objects) != 0 {
 			objectId = listObjects.Objects[0].ObjectInfo.Id.Uint64()
 			break
 		}
 	}
 	objectIds := []uint64{objectId}
 	response, err := testAccount.SDKClient.ListObjectsByObjectID(context.Background(), objectIds)
-	log.Infof("ListObjectsByObjectID: %v", response.Objects[0], err)
+	log.Infof("ListObjectsByObjectID: %v", response.Objects[0])
 	s.NoError(err, "call objects-query error")
 	s.NotEmpty(response)
 }

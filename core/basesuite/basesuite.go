@@ -34,7 +34,10 @@ func (s *BaseSuite) SetupSuite() {
 	s.InitAccountsBNBBalance([]*Account{s.TestAcc}, 3e17)
 
 	spAddr := config.CfgEnv.SPAddr
-	spInfo, _ := s.TestAcc.SelectSP(spAddr)
+	spInfo, err := s.TestAcc.SelectSP(spAddr)
+	if err != nil {
+		log.Fatalf("SelectSP err: %v, please ensure sp operator address: %s is in service", err, spAddr)
+	}
 	s.SPInfo = spInfo
 	log.Infof("SP Endpoint: %s, address: %s", spInfo.Endpoint, spInfo.OperatorAddress)
 

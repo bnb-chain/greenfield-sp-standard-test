@@ -91,12 +91,13 @@ func (a *Account) SelectSP(primarySPAddr string) (*spTypes.StorageProvider, erro
 		return nil, err
 	}
 	for _, sp := range providers {
+		log.Infof("sp operator address: %s, endpoint: %s, config sp address: %s", sp.OperatorAddress, sp.Endpoint, primarySPAddr)
 		if sp.OperatorAddress == primarySPAddr {
 			return &sp, nil
 		}
 	}
 
-	return nil, fmt.Errorf("not funde this key for end point: %s", primarySPAddr)
+	return nil, fmt.Errorf("not funde this sp: %s", primarySPAddr)
 }
 func (a *Account) CreateBucket(bucketName string, opts *sdkTypes.CreateBucketOptions) (string, error) {
 	if opts == nil {
