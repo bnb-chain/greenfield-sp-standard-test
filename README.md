@@ -11,7 +11,7 @@ for any bug bounty. We advise you to be careful and experiment on the network at
 
 Clone the repository.
 ```shell
- git clone https://github.com/node-real/greenfield-sp-standard-test.git
+ git clone https://github.com/bnb-chain/greenfield-sp-standard-test.git
  cd greenfield-sp-standard-test
  go mod tidy
 ```
