@@ -119,7 +119,7 @@ func (s *SPFunctionalTestSuite) Test_01_DeleteObjectBucket() {
 	// Wait for delete transaction to complete
 	txInfo, err := testAccount.SDKClient.WaitForTx(context.Background(), deleteObjectTxHash)
 	s.NoError(err)
-	s.True(txInfo.Code == 0)
+	s.True(txInfo.Code == 0, txInfo)
 
 	// Check if object info is nil after deletion
 	objectInfo2, err := testAccount.SDKClient.HeadObject(context.Background(), bucketName, objectName)
@@ -137,7 +137,7 @@ func (s *SPFunctionalTestSuite) Test_01_DeleteObjectBucket() {
 	// Wait for delete bucket transaction to complete
 	deleteBucketTxInfo, err := testAccount.SDKClient.WaitForTx(context.Background(), deleteBucketTxHash)
 	s.NoError(err)
-	s.True(deleteBucketTxInfo.Code == 0)
+	s.True(deleteBucketTxInfo.Code == 0, deleteBucketTxInfo)
 }
 func (s *SPFunctionalTestSuite) Test_02_CheckDownloadQuota() {
 	bucketName := utils.GetRandomBucketName()
@@ -277,7 +277,7 @@ func (s *SPFunctionalTestSuite) Test_08_BucketsByIdsObjectsByIds() {
 	listBuckets, err := testAccount.SDKClient.ListBuckets(context.Background())
 	s.NoError(err)
 	s.NotEmpty(listBuckets.Buckets)
-	log.Infof("list users: %s buckets length: %v", testAccount.Addr.String(), len(listBuckets.Buckets))
+	log.Infof("list users: %s , buckets length: %v", testAccount.Addr.String(), len(listBuckets.Buckets))
 
 	bucketsId := []uint64{listBuckets.Buckets[0].BucketInfo.Id.Uint64()}
 	response0, err := testAccount.SDKClient.ListBucketsByBucketID(context.Background(), bucketsId)
@@ -352,13 +352,14 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 	// case 1: access universal endpoint from non-browser;
 	header := make(map[string]string)
 	response, err := utils.HttpGetWithHeader(publicUniversalEndpoint, header)
+	s.NoError(err)
 	log.Debugf(" publicUniversalEndpoint Response is :%v, error is %v", response, err)
-	s.True(len(response) == int(fileSize)) // the response size is 1, as the upload file size is 1b
+	s.True(len(response) == int(fileSize), response) // the response size is 1, as the upload file size is 1b
 
 	// case 2: access universal endpoint from public object
 	header["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/114.0" //
 	response, err = utils.HttpGetWithHeader(publicUniversalEndpoint, header)
-	log.Debugf("publicUniversalEndpoint response: %s", response)
+	log.Infof("publicUniversalEndpoint response: %s", response)
 	s.NoError(err)
 	s.True(!strings.Contains(response, "error"))
 
@@ -380,8 +381,8 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 	universalEndpointWithPersonalSig := fmt.Sprintf("%s?expiry=%s&signature=%s", privateUniversalEndpoint, expiryStr, signString)
 	log.Debugf("universalEndpointWithPersonalSig is: " + universalEndpointWithPersonalSig)
 	response, err = utils.HttpGetWithHeader(universalEndpointWithPersonalSig, header)
-	log.Debugf("access universal endpoint with auth string, from browser,  Response is :%v, error is %v", response, err)
-	s.True(len(response) == int(fileSize)) // the response size is 1, as the upload file size is 1b
+	log.Debugf("universalEndpointWithPersonalSig Response is :%v, error is %v", response, err)
+	s.True(len(response) == int(fileSize), response)
 
 }
 
@@ -415,6 +416,6 @@ func (s *SPFunctionalTestSuite) Test_12_OffChainAuth() {
 	header["Authorization"] = authString
 	response, error1 := utils.HttpGetWithHeader(s.SPInfo.Endpoint, header)
 	log.Infof("getUserBucket Response is :%v, error is %v", response, error1)
-	s.True(strings.Contains(response, "\"buckets\":["))
+	s.True(strings.Contains(response, "\"buckets\":["), "response not contains buckets")
 	s.NoError(error1, "call getUserBucketError error")
 }

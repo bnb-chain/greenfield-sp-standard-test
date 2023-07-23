@@ -85,11 +85,16 @@ func NewAccountsByNumber(greenfieldEndpoint, chainId, spAddr string, number int)
 }
 
 func (a *Account) SelectSP(primarySPAddr string) (*spTypes.StorageProvider, error) {
-	a.PrimarySPAddr = primarySPAddr
 	providers, err := a.SDKClient.ListStorageProviders(context.Background(), true)
 	if err != nil {
 		return nil, err
 	}
+	spAddress, err := types.AccAddressFromHexUnsafe(primarySPAddr)
+	if err != nil {
+		return nil, err
+	}
+	primarySPAddr = spAddress.String()
+	a.PrimarySPAddr = primarySPAddr
 	for _, sp := range providers {
 		log.Infof("sp operator address: %s, endpoint: %s, config sp address: %s", sp.OperatorAddress, sp.Endpoint, primarySPAddr)
 		if sp.OperatorAddress == primarySPAddr {
