@@ -4,11 +4,11 @@ GreenfieldChainId: greenfield_5600-1
 
 # private key: RootAcc  need have BNB balance
 # TODO: replace to yourself private key
-RootAcc:
+RootAcc: d10128818fac95127245b8115341ab39e7369af2d8430efb1d54e56630432ee1
 TestAcc:
 
 # TODO: replace to you want to test SP operator address
-SPOperatorAddr:
+SPOperatorAddr: 0x22804504786F44289D4156E7317142e25B92c00e
 # performance test params
 TPS: 2
 # Number of users. If the user.csv file does not exist or contains fewer accounts than the configured value, new account private keys will be automatically generated and saved in the user.csv file.
