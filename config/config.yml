@@ -5,6 +5,7 @@ GreenfieldChainId: greenfield_5600-1
 # private key: RootAcc  need have BNB balance
 # TODO: replace to yourself private key
 RootAcc:
+#  If you do not provide a value for TestAcc, the test process will automatically generate a TestAcc private key using RootAcc. Please note that RootAcc is mandatory.
 TestAcc:
 
 # TODO: replace to you want to test SP operator address
