@@ -5,22 +5,25 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	httplib "github.com/bnb-chain/greenfield-common/go/http"
+	sdkClient "github.com/bnb-chain/greenfield-go-sdk/client"
+	"github.com/bnb-chain/greenfield-sp-standard-test/config"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"io"
+	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/consensys/gnark-crypto/ecc/bn254/fr/mimc"
-	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/stretchr/testify/suite"
-	"github.com/tidwall/gjson"
 
 	sdkTypes "github.com/bnb-chain/greenfield-go-sdk/types"
 	"github.com/bnb-chain/greenfield-sp-standard-test/core/basesuite"
 	"github.com/bnb-chain/greenfield-sp-standard-test/core/log"
 	"github.com/bnb-chain/greenfield-sp-standard-test/core/utils"
 	storageTypes "github.com/bnb-chain/greenfield/x/storage/types"
+	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/stretchr/testify/suite"
 )
 
 type SPFunctionalTestSuite struct {
@@ -119,7 +122,7 @@ func (s *SPFunctionalTestSuite) Test_01_DeleteObjectBucket() {
 	// Wait for delete transaction to complete
 	txInfo, err := testAccount.SDKClient.WaitForTx(context.Background(), deleteObjectTxHash)
 	s.NoError(err)
-	s.True(txInfo.Code == 0)
+	s.True(txInfo.TxResult.Code == 0)
 
 	// Check if object info is nil after deletion
 	objectInfo2, err := testAccount.SDKClient.HeadObject(context.Background(), bucketName, objectName)
@@ -137,7 +140,7 @@ func (s *SPFunctionalTestSuite) Test_01_DeleteObjectBucket() {
 	// Wait for delete bucket transaction to complete
 	deleteBucketTxInfo, err := testAccount.SDKClient.WaitForTx(context.Background(), deleteBucketTxHash)
 	s.NoError(err)
-	s.True(deleteBucketTxInfo.Code == 0)
+	s.True(deleteBucketTxInfo.TxResult.Code == 0)
 }
 func (s *SPFunctionalTestSuite) Test_02_CheckDownloadQuota() {
 	bucketName := utils.GetRandomBucketName()
@@ -251,14 +254,14 @@ func (s *SPFunctionalTestSuite) Test_05_ListUserBucketObject() {
 	testAccount := s.TestAcc
 
 	// List buckets for the testAccount
-	listBuckets, err := testAccount.SDKClient.ListBuckets(context.Background())
+	listBuckets, err := testAccount.SDKClient.ListBuckets(context.Background(), sdkTypes.EndPointOptions{})
 	s.NoError(err)
 	s.NotEmpty(listBuckets.Buckets)
 	log.Infof("List users: %s buckets: %v", testAccount.Addr.String(), listBuckets.Buckets)
 
 	// List objects for the first bucket
 	bucketName := listBuckets.Buckets[0].BucketInfo.BucketName
-	listObjects, err := testAccount.SDKClient.ListObjects(context.Background(), bucketName, sdkTypes.ListObjectsOptions{})
+	listObjects, err := testAccount.SDKClient.ListObjects(context.Background(), bucketName, sdkTypes.ListObjectsOptions{EndPointOptions: &sdkTypes.EndPointOptions{}})
 	s.NoError(err)
 	log.Infof("List users: %s objects: %v", testAccount.Addr.String(), listObjects.Objects)
 }
@@ -274,20 +277,20 @@ func (s *SPFunctionalTestSuite) Test_06_GetNonce() {
 
 func (s *SPFunctionalTestSuite) Test_08_BucketsByIdsObjectsByIds() {
 	testAccount := s.TestAcc
-	listBuckets, err := testAccount.SDKClient.ListBuckets(context.Background())
+	listBuckets, err := testAccount.SDKClient.ListBuckets(context.Background(), sdkTypes.EndPointOptions{})
 	s.NoError(err)
 	s.NotEmpty(listBuckets.Buckets)
 	log.Infof("list users: %s buckets length: %v", testAccount.Addr.String(), len(listBuckets.Buckets))
 
 	bucketsId := []uint64{listBuckets.Buckets[0].BucketInfo.Id.Uint64()}
-	response0, err := testAccount.SDKClient.ListBucketsByBucketID(context.Background(), bucketsId)
+	response0, err := testAccount.SDKClient.ListBucketsByBucketID(context.Background(), bucketsId, sdkTypes.EndPointOptions{})
 	log.Infof("ListBucketsByBucketID: %v", response0.Buckets[0], err)
 	s.NoError(err, "call buckets-query error")
 	s.NotEmpty(response0.Buckets)
 	objectId := uint64(0)
 	for _, bucket := range listBuckets.Buckets {
 		bucketName := bucket.BucketInfo.BucketName
-		listObjects, err := testAccount.SDKClient.ListObjects(context.Background(), bucketName, sdkTypes.ListObjectsOptions{})
+		listObjects, err := testAccount.SDKClient.ListObjects(context.Background(), bucketName, sdkTypes.ListObjectsOptions{EndPointOptions: &sdkTypes.EndPointOptions{}})
 		s.NoError(err)
 		log.Infof("list users: %s objects length: %v", testAccount.Addr.String(), len(listObjects.Objects))
 		if listObjects.Objects != nil {
@@ -296,7 +299,7 @@ func (s *SPFunctionalTestSuite) Test_08_BucketsByIdsObjectsByIds() {
 		}
 	}
 	objectIds := []uint64{objectId}
-	response, err := testAccount.SDKClient.ListObjectsByObjectID(context.Background(), objectIds)
+	response, err := testAccount.SDKClient.ListObjectsByObjectID(context.Background(), objectIds, sdkTypes.EndPointOptions{})
 	log.Infof("ListObjectsByObjectID: %v", response.Objects[0], err)
 	s.NoError(err, "call objects-query error")
 	s.NotEmpty(response)
@@ -306,7 +309,7 @@ func (s *SPFunctionalTestSuite) Test_09_ListGroupByNameAndPrefix() {
 	name := "x"
 	prefix := "t"
 	testAccount := s.TestAcc
-	listGroupByNameAndPrefix, err := testAccount.SDKClient.ListGroup(context.Background(), name, prefix, sdkTypes.ListGroupsOptions{})
+	listGroupByNameAndPrefix, err := testAccount.SDKClient.ListGroup(context.Background(), name, prefix, sdkTypes.ListGroupsOptions{EndPointOptions: &sdkTypes.EndPointOptions{}})
 	log.Infof("listGroupByNameAndPrefix: %v", listGroupByNameAndPrefix)
 	s.NoError(err, "ListGroupsByNameAndPrefix error")
 }
@@ -349,23 +352,23 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 	privateUniversalEndpoint := fmt.Sprintf("%s/download/%s/%s", s.SPInfo.Endpoint, bucketName, privateObjectName)
 	log.Infof("publicUniversalEndpoint: %s", publicUniversalEndpoint)
 	log.Infof("privateUniversalEndpoint: %s", privateUniversalEndpoint)
-	time.Sleep(3 * time.Second)
+	time.Sleep(5 * time.Second)
 	// case 1: access universal endpoint from non-browser;
 	header := make(map[string]string)
 	response, err := utils.HttpGetWithHeader(publicUniversalEndpoint, header)
 	log.Debugf(" publicUniversalEndpoint Response is :%v, error is %v", response, err)
-	s.True(len(response) == int(fileSize)) // the response size is 1, as the upload file size is 1b
+	s.True(len(response) == int(fileSize))
 
 	// case 2: access universal endpoint from public object
 	header["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/114.0" //
 	response, err = utils.HttpGetWithHeader(publicUniversalEndpoint, header)
-	log.Debugf("publicUniversalEndpoint response: %s", response)
+	log.Infof("publicUniversalEndpoint response: %s", response)
 	s.NoError(err)
 	s.True(!strings.Contains(response, "error"))
 
 	// case 3: access universal endpoint without auth string from browser; expect to get a build-in dapp HTML
 	response, err = utils.HttpGetWithHeader(privateUniversalEndpoint, header)
-	log.Debugf("access universal endpoint without auth string, from browser,  Response is :%v, error is %v", response, err)
+	log.Infof("access universal endpoint without auth string, from browser,  Response is :%v, error is %v", response, err)
 	s.True(strings.Contains(response, "<!doctype html><html")) // <!doctype html><html....
 
 	// case 4: use user's private key to make a wallet personal sign, and append the signature to the private universal endpoint
@@ -378,44 +381,67 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 	sig, _ := s.TestAcc.KM.Sign(signedMsgHash)
 	signString := utils.ConvertToString(sig)
 
-	universalEndpointWithPersonalSig := fmt.Sprintf("%s?expiry=%s&signature=%s", privateUniversalEndpoint, expiryStr, signString)
-	log.Debugf("universalEndpointWithPersonalSig is: " + universalEndpointWithPersonalSig)
+	universalEndpointWithPersonalSig := fmt.Sprintf("%s?X-Gnfd-Expiry-Timestamp=%s&signature=%s", privateUniversalEndpoint, expiryStr, signString)
+	log.Infof("universalEndpointWithPersonalSig is: " + universalEndpointWithPersonalSig)
 	response, err = utils.HttpGetWithHeader(universalEndpointWithPersonalSig, header)
-	log.Debugf("access universal endpoint with auth string, from browser,  Response is :%v, error is %v", response, err)
-	s.True(len(response) == int(fileSize)) // the response size is 1, as the upload file size is 1b
+	log.Infof("access universal endpoint with auth string, from browser,  Response is :%v, error is %v", response, err)
+	s.True(len(response) == int(fileSize))
 
 }
 
 func (s *SPFunctionalTestSuite) Test_12_OffChainAuth() {
-	appDomain := "https://greenfield.bnbchain.org/"
-	privateKeyNew, _ := crypto.GenerateKey()
-	addressNew := crypto.PubkeyToAddress(privateKeyNew.PublicKey)
-	// 1. user browser seed string, which is the eddsa private key
-	eddsaSeed := "test_seed"
-	// 2. registerEDDSAPublicKey
-	requestNonceResp, err := utils.GetNonce(addressNew.Hex(), s.SPInfo.Endpoint)
+	defaultAcct, _ := s.TestAcc.SDKClient.GetDefaultAccount()
+	offChainClient, err := sdkClient.New(config.CfgEnv.GreenfieldChainId, config.CfgEnv.GreenfieldEndpoint, sdkClient.Option{
+		DefaultAccount: defaultAcct,
+		OffChainAuthOption: &sdkClient.OffChainAuthOption{
+			Seed:                 "test_seed",
+			Domain:               "https://test.domain.com",
+			ShouldRegisterPubKey: true,
+		}, GrpcDialOption: grpc.WithTransportCredentials(insecure.NewCredentials())})
+	s.TestAcc.SDKClient = offChainClient
+
+	if err != nil {
+		log.Errorf("sdk new client err: %v", err)
+		panic(err)
+	}
+
+	bucketName := utils.GetRandomBucketName()
+	objectName := utils.GetRandomObjectName()
+	fileSize := uint64(utils.RandInt64(1024, 10*1024))
+	testAccount := s.TestAcc
+
+	// Create bucket
+	bucketTx, err := testAccount.CreateBucket(bucketName, nil)
 	s.NoError(err)
-	nextNonce := gjson.Get(requestNonceResp, "next_nonce").String()
-	jsonResult, error1 := utils.RegisterEDDSAPublicKey(appDomain, s.SPInfo.Endpoint, eddsaSeed, s.SPInfo.OperatorAddress, nextNonce, addressNew, privateKeyNew)
-	s.NotEmpty(jsonResult)
-	s.True(strings.Contains(jsonResult, "true"))
-	s.NoError(error1, "call /auth/update_key")
+	log.Infof("Created bucket: %s, txHash: %s", bucketName, bucketTx)
 
-	sk, _ := utils.GenerateEddsaPrivateKey(eddsaSeed)
-	unSignedMsg := fmt.Sprintf("InvokeListBucketsAPI_%v", time.Now().Add(time.Minute*2).UnixMilli())
-	hFunc := mimc.NewMiMC()
+	// Create and upload object
+	_, res, file, err := testAccount.CreateObjectAllSize(bucketName, objectName, fileSize, nil)
+	s.NoError(err)
+	err = testAccount.PutObject(bucketName, objectName, res, *file, nil)
+	s.NoError(err)
 
-	sig, _ := sk.Sign([]byte(unSignedMsg), hFunc)
-	authString := fmt.Sprintf("OffChainAuth EDDSA,SignedMsg=%v,Signature=%v", unSignedMsg, hex.EncodeToString(sig))
+	// Check if object is sealed
+	objectInfo := testAccount.IsObjectSealed(bucketName, objectName)
+	s.Equal(storageTypes.OBJECT_STATUS_SEALED, objectInfo.ObjectStatus, "object not sealed")
 
-	// 3. invoke list user buckets
-	userAddress := addressNew.Hex()
-	header := make(map[string]string)
-	header["X-Gnfd-User-Address"] = userAddress
-	header["X-Gnfd-App-Domain"] = appDomain
-	header["Authorization"] = authString
-	response, error1 := utils.HttpGetWithHeader(s.SPInfo.Endpoint, header)
-	log.Infof("getUserBucket Response is :%v, error is %v", response, error1)
-	s.True(strings.Contains(response, "\"buckets\":["))
-	s.NoError(error1, "call getUserBucketError error")
+	time.Sleep(5 * time.Second)
+	// download file in a pre-signed way by calling getObject API
+
+	getObjectEndpoint := fmt.Sprintf("%s/%s/%s", s.SPInfo.Endpoint, bucketName, objectName)
+
+	ExpiryDateFormat := "2006-01-02T15:04:05Z"
+	expiryStr := time.Now().Add(time.Minute * 4).Format(ExpiryDateFormat)
+
+	getObjectEndpointWithPresignedParams := fmt.Sprintf("%s?X-Gnfd-Expiry-Timestamp=%s&X-Gnfd-User-Address=%s&X-Gnfd-App-Domain=%s", getObjectEndpoint, expiryStr, defaultAcct.GetAddress().String(), "https://test.domain.com")
+	log.Debugf("getObjectEndpointWithPreSignedParams is: " + getObjectEndpointWithPresignedParams)
+	req, err := http.NewRequest(http.MethodGet, getObjectEndpointWithPresignedParams, nil)
+	unsignedMsg := httplib.GetMsgToSignForPreSignedURL(req)
+	authStr := testAccount.SDKClient.OffChainAuthSign(unsignedMsg)
+	getObjectEndpointWithPresignedParams = getObjectEndpointWithPresignedParams + "&Authorization=" + url.QueryEscape(authStr)
+	log.Infof("getObjectEndpointWithPresignedParams is %s", getObjectEndpointWithPresignedParams)
+
+	fileDownLoadStr, err := utils.HttpGetWithHeader(getObjectEndpointWithPresignedParams, make(map[string]string))
+	log.Infof("access getObjectEndpoint with auth preSignedURL, from browser,  Response is :%v, error is %v", fileDownLoadStr, err)
+	s.True(len(fileDownLoadStr) == int(fileSize))
 }

@@ -148,7 +148,7 @@ func (a *Account) CreateObjectAllSize(bucketName, objectName string, fileSize ui
 	if err != nil {
 		return nil, "", nil, err
 	}
-	return info, txHash, &utils.File{Reader: bytes.NewReader(buffer.Bytes()), Size: int64(buffer.Len())}, nil
+	return info.ObjectInfo, txHash, &utils.File{Reader: bytes.NewReader(buffer.Bytes()), Size: int64(buffer.Len())}, nil
 }
 
 func (a *Account) PutObject(bucketName, objectName, createObjectTx string, file utils.File, opts *sdkTypes.PutObjectOptions) error {
@@ -162,9 +162,9 @@ func (a *Account) IsObjectSealed(bucketName, objectName string) *storageTypes.Ob
 	i := 0
 	for i < 30 {
 		info, err := a.SDKClient.HeadObject(a.Ctx, bucketName, objectName)
-		if info != nil && err == nil && info.ObjectStatus == storageTypes.OBJECT_STATUS_SEALED {
+		if info != nil && err == nil && info.ObjectInfo.ObjectStatus == storageTypes.OBJECT_STATUS_SEALED {
 			log.Infof("bucket: %s,object: %s is sealed", bucketName, objectName)
-			return info
+			return info.ObjectInfo
 		}
 		time.Sleep(time.Second)
 		i++
@@ -173,7 +173,7 @@ func (a *Account) IsObjectSealed(bucketName, objectName string) *storageTypes.Ob
 	if err != nil {
 		log.Errorf("HeadObject err: %v", err)
 	}
-	return info
+	return info.ObjectInfo
 }
 
 func (a *Account) GetObject(bucketName, objectName string) (io.ReadCloser, sdkTypes.ObjectStat, error) {

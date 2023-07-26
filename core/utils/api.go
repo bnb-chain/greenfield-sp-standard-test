@@ -64,7 +64,7 @@ func UpdateAccountKey(SpAddress, endpoint string) (string, error) {
 	headers["x-gnfd-app-domain"] = domainNew
 	headers["x-gnfd-app-reg-nonce"] = requestNonce
 	headers["x-gnfd-app-reg-public-key"] = PublicKeyString
-	headers["x-gnfd-app-reg-expiry-date"] = ExpiryDate
+	headers["X-Gnfd-Expiry-Timestamp"] = ExpiryDate
 	headers["authorization"] = AuthString
 	headers["origin"] = domainNew
 	headers["x-gnfd-user-address"] = User
@@ -136,7 +136,7 @@ func GenerateKey(r io.Reader) (*eddsa.PrivateKey, error) {
 
 	var bscalar big.Int
 	bscalar.SetBytes(scalar[:])
-	pub.A.ScalarMultiplication(&c.Base, &bscalar)
+	pub.A.ScalarMul(&c.Base, &bscalar)
 	var res [sizeFr * 3]byte
 	pubkBin := pub.A.Bytes()
 	subtle.ConstantTimeCopy(1, res[:sizeFr], pubkBin[:])
@@ -170,7 +170,7 @@ func RegisterEDDSAPublicKey(appDomain, endpoint, eddsaSeed, SpAddress, requestNo
 	headers["x-gnfd-app-domain"] = appDomain
 	headers["x-gnfd-app-reg-nonce"] = requestNonce
 	headers["x-gnfd-app-reg-public-key"] = publicKeyString
-	headers["x-gnfd-app-reg-expiry-date"] = ExpiryDate
+	headers["X-Gnfd-Expiry-Timestamp"] = ExpiryDate
 	headers["authorization"] = AuthString
 	headers["origin"] = "https://greenfield.bnbchain.org/"
 	headers["x-gnfd-user-address"] = User
