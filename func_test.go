@@ -89,7 +89,7 @@ func (s *SPFunctionalTestSuite) Test_00_UploadMultiSizeFile() {
 
 			fileHash := hex.EncodeToString(hashA.Sum(nil))
 			downloadHash := hex.EncodeToString(hashB.Sum(nil))
-			s.Equal(fileHash, downloadHash, "hash is not the same")
+			s.Equal(fileHash, downloadHash, "Download file hash is not the same")
 		})
 	}
 }
