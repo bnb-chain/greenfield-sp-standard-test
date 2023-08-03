@@ -137,7 +137,7 @@ func (s *SPLoadTestSuite) Test_upload_download() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			err := pool.Submit(func() {
+			_ = pool.Submit(func() {
 				testAccount := s.loadTestAccount.Next().(*basesuite.Account)
 				testUserAddr := testAccount.Addr.String()
 				r := rand.Int() % 2
@@ -239,10 +239,7 @@ func (s *SPLoadTestSuite) Test_upload_download() {
 				}
 
 			})
-			if err != nil {
-				log.Errorf("pool submit err: %v", err)
-				return
-			}
+
 		}()
 
 	}

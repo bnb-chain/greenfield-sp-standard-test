@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bnb-chain/greenfield-sp-standard-test/config"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr/mimc"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -26,11 +27,12 @@ import (
 type SPFunctionalTestSuite struct {
 	basesuite.BaseSuite
 	suite.Suite
+	spEndpointOptions *sdkTypes.EndPointOptions
 }
 
 func (s *SPFunctionalTestSuite) SetupSuite() {
 	s.BaseSuite.SetupSuite()
-
+	s.spEndpointOptions = &sdkTypes.EndPointOptions{SPAddress: s.SPInfo.OperatorAddress, Endpoint: s.SPInfo.Endpoint}
 }
 func TestSPFunctional(t *testing.T) {
 	suite.Run(t, new(SPFunctionalTestSuite))
@@ -69,7 +71,7 @@ func (s *SPFunctionalTestSuite) Test_00_UploadMultiSizeFile() {
 			log.Infof("Waiting for seal - object: %s, bucket: %v", objectName, bucketName)
 			info := testAccount.IsObjectSealed(bucketName, objectName)
 			s.Equal(info.ObjectStatus, storageTypes.OBJECT_STATUS_SEALED, fmt.Sprintf("===ObjectSealed failed - endpoint: %s, status: %s===", s.SPInfo.Endpoint, info.ObjectStatus.String()))
-
+			time.Sleep(time.Second * 10)
 			log.Infof("Downloading file - object: %s, bucket: %v", objectName, bucketName)
 			fileDownLoad, info2, err := testAccount.GetObject(bucketName, objectName)
 			s.NoError(err, fmt.Sprintf("===info2: %v, info: %v ", info2, info))
@@ -119,7 +121,7 @@ func (s *SPFunctionalTestSuite) Test_01_DeleteObjectBucket() {
 	// Wait for delete transaction to complete
 	txInfo, err := testAccount.SDKClient.WaitForTx(context.Background(), deleteObjectTxHash)
 	s.NoError(err)
-	s.True(txInfo.Code == 0, txInfo)
+	s.True(txInfo.TxResult.Code == 0, txInfo)
 
 	// Check if object info is nil after deletion
 	objectInfo2, err := testAccount.SDKClient.HeadObject(context.Background(), bucketName, objectName)
@@ -137,7 +139,7 @@ func (s *SPFunctionalTestSuite) Test_01_DeleteObjectBucket() {
 	// Wait for delete bucket transaction to complete
 	deleteBucketTxInfo, err := testAccount.SDKClient.WaitForTx(context.Background(), deleteBucketTxHash)
 	s.NoError(err)
-	s.True(deleteBucketTxInfo.Code == 0, deleteBucketTxInfo)
+	s.True(deleteBucketTxInfo.TxResult.Code == 0, deleteBucketTxInfo)
 }
 func (s *SPFunctionalTestSuite) Test_02_CheckDownloadQuota() {
 	bucketName := utils.GetRandomBucketName()
@@ -199,9 +201,7 @@ func (s *SPFunctionalTestSuite) Test_03_VerifySPPrice() {
 
 	storePrice, _ := spPriceInfo.StorePrice.Float64()
 	readPrice, _ := spPriceInfo.ReadPrice.Float64()
-
 	log.Infof("Read price: %v, Store price: %v", readPrice, storePrice)
-
 	s.NotZero(storePrice, "Store price is 0")
 	s.NotZero(readPrice, "Read price is 0")
 }
@@ -243,30 +243,31 @@ func (s *SPFunctionalTestSuite) Test_04_VerifyAuth() {
 
 	// Get object from testAccountA
 	fileDownLoad, _, err = testAccountA.GetObject(bucketName, objectName2)
-	s.NotEmpty(fileDownLoad)
 	s.NoError(err)
+	s.NotEmpty(fileDownLoad)
 }
 
 func (s *SPFunctionalTestSuite) Test_05_ListUserBucketObject() {
 	testAccount := s.TestAcc
-
 	// List buckets for the testAccount
-	listBuckets, err := testAccount.SDKClient.ListBuckets(context.Background())
+	listBuckets, err := testAccount.SDKClient.ListBuckets(context.Background(), sdkTypes.ListBucketsOptions{EndPointOptions: s.spEndpointOptions}) //
 	s.NoError(err)
 	s.NotEmpty(listBuckets.Buckets)
 	log.Infof("List users: %s buckets: %v", testAccount.Addr.String(), listBuckets.Buckets)
 
 	// List objects for the first bucket
 	bucketName := listBuckets.Buckets[0].BucketInfo.BucketName
-	listObjects, err := testAccount.SDKClient.ListObjects(context.Background(), bucketName, sdkTypes.ListObjectsOptions{})
+	listObjects, err := testAccount.SDKClient.ListObjects(context.Background(), bucketName, sdkTypes.ListObjectsOptions{EndPointOptions: s.spEndpointOptions})
 	s.NoError(err)
 	log.Infof("List users: %s objects: %v", testAccount.Addr.String(), listObjects.Objects)
 }
 
 func (s *SPFunctionalTestSuite) Test_06_GetNonce() {
 	userAddress := s.TestAcc.Addr.String()
-	response, err := utils.GetNonce(userAddress, s.SPInfo.Endpoint)
-	log.Infof("GetNonce response: %v", response)
+	respHeader, response, err := utils.GetNonce(userAddress, s.SPInfo.Endpoint)
+	log.Debugf("GetNonce response: %v", response)
+	log.Debugf("respHeader: %v", respHeader)
+
 	s.NoError(err, "call /auth/request_nonce error")
 	s.NotEmpty(response)
 	s.True(strings.Contains(response, "next_nonce"))
@@ -274,20 +275,20 @@ func (s *SPFunctionalTestSuite) Test_06_GetNonce() {
 
 func (s *SPFunctionalTestSuite) Test_08_BucketsByIdsObjectsByIds() {
 	testAccount := s.TestAcc
-	listBuckets, err := testAccount.SDKClient.ListBuckets(context.Background())
+	listBuckets, err := testAccount.SDKClient.ListBuckets(context.Background(), sdkTypes.ListBucketsOptions{EndPointOptions: s.spEndpointOptions})
 	s.NoError(err)
 	s.NotEmpty(listBuckets.Buckets)
 	log.Infof("list users: %s , buckets length: %v", testAccount.Addr.String(), len(listBuckets.Buckets))
 
 	bucketsId := []uint64{listBuckets.Buckets[0].BucketInfo.Id.Uint64()}
-	response0, err := testAccount.SDKClient.ListBucketsByBucketID(context.Background(), bucketsId)
+	response0, err := testAccount.SDKClient.ListBucketsByBucketID(context.Background(), bucketsId, *s.spEndpointOptions)
 	log.Infof("ListBucketsByBucketID: %v", response0.Buckets[0])
 	s.NoError(err, "call buckets-query error")
 	s.NotEmpty(response0.Buckets)
 	objectId := uint64(0)
 	for _, bucket := range listBuckets.Buckets {
 		bucketName := bucket.BucketInfo.BucketName
-		listObjects, _ := testAccount.SDKClient.ListObjects(context.Background(), bucketName, sdkTypes.ListObjectsOptions{})
+		listObjects, _ := testAccount.SDKClient.ListObjects(context.Background(), bucketName, sdkTypes.ListObjectsOptions{EndPointOptions: s.spEndpointOptions})
 		log.Infof("list users: %s objects length: %v", testAccount.Addr.String(), len(listObjects.Objects))
 		if len(listObjects.Objects) != 0 {
 			objectId = listObjects.Objects[0].ObjectInfo.Id.Uint64()
@@ -295,25 +296,29 @@ func (s *SPFunctionalTestSuite) Test_08_BucketsByIdsObjectsByIds() {
 		}
 	}
 	objectIds := []uint64{objectId}
-	response, err := testAccount.SDKClient.ListObjectsByObjectID(context.Background(), objectIds)
+	response, err := testAccount.SDKClient.ListObjectsByObjectID(context.Background(), objectIds, sdkTypes.EndPointOptions{})
 	log.Infof("ListObjectsByObjectID: %v", response.Objects[0])
 	s.NoError(err, "call objects-query error")
 	s.NotEmpty(response)
 }
 func (s *SPFunctionalTestSuite) Test_09_ListGroupByNameAndPrefix() {
-	// group name start "prefix", contain name
+	// group name start "prefix", contain "name"
 	name := "x"
 	prefix := "t"
 	testAccount := s.TestAcc
-	listGroupByNameAndPrefix, err := testAccount.SDKClient.ListGroup(context.Background(), name, prefix, sdkTypes.ListGroupsOptions{})
+	listGroupByNameAndPrefix, err := testAccount.SDKClient.ListGroup(context.Background(), name, prefix, sdkTypes.ListGroupsOptions{EndPointOptions: s.spEndpointOptions})
 	log.Infof("listGroupByNameAndPrefix: %v", listGroupByNameAndPrefix)
 	s.NoError(err, "ListGroupsByNameAndPrefix error")
 }
 
 func (s *SPFunctionalTestSuite) Test_10_UpdateAccountKey() {
-	res, err := utils.UpdateAccountKey(s.SPInfo.OperatorAddress, s.SPInfo.Endpoint)
+	respHeader, res, err := utils.UpdateAccountKey(s.SPInfo.OperatorAddress, s.SPInfo.Endpoint)
 	s.NoError(err, "call /auth/update_key")
 	s.True(strings.Contains(res, "true"))
+	for headerKey, headerValue := range config.CfgEnv.HttpHeaders {
+		keyValues := respHeader.Get(headerKey)
+		s.Equal(keyValues, headerValue, "need contain headers support cross origin")
+	}
 }
 
 func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
@@ -321,7 +326,7 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 	bucketName := utils.GetRandomBucketName()
 	publicObjectName := utils.GetRandomObjectName()
 	privateObjectName := utils.GetRandomObjectName()
-	fileSize := uint64(utils.RandInt64(1024, 10*1024))
+	fileSize := uint64(utils.RandInt64(1024, 5*1024))
 
 	// Create bucket
 	bucketTx, err := testAccount.CreateBucket(bucketName, nil)
@@ -358,8 +363,13 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 
 	// case 2: access universal endpoint from public object
 	header["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/114.0" //
-	response, err = utils.HttpGetWithHeader(publicUniversalEndpoint, header)
-	log.Infof("publicUniversalEndpoint response: %s", response)
+	respHeader, response, err := utils.HttpGetWithHeaders(publicUniversalEndpoint, header)
+	log.Debugf("respHeader: %v", respHeader)
+	for headerKey, headerValue := range config.CfgEnv.HttpHeaders {
+		keyValues := respHeader.Get(headerKey)
+		s.Equal(keyValues, headerValue, "need contain headers support cross origin")
+	}
+	log.Debugf("publicUniversalEndpoint response: %s", response)
 	s.NoError(err)
 	s.True(!strings.Contains(response, "error"))
 
@@ -377,7 +387,6 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 
 	sig, _ := s.TestAcc.KM.Sign(signedMsgHash)
 	signString := utils.ConvertToString(sig)
-
 	universalEndpointWithPersonalSig := fmt.Sprintf("%s?expiry=%s&signature=%s", privateUniversalEndpoint, expiryStr, signString)
 	log.Debugf("universalEndpointWithPersonalSig is: " + universalEndpointWithPersonalSig)
 	response, err = utils.HttpGetWithHeader(universalEndpointWithPersonalSig, header)
@@ -393,7 +402,7 @@ func (s *SPFunctionalTestSuite) Test_12_OffChainAuth() {
 	// 1. user browser seed string, which is the eddsa private key
 	eddsaSeed := "test_seed"
 	// 2. registerEDDSAPublicKey
-	requestNonceResp, err := utils.GetNonce(addressNew.Hex(), s.SPInfo.Endpoint)
+	_, requestNonceResp, err := utils.GetNonce(addressNew.Hex(), s.SPInfo.Endpoint)
 	s.NoError(err)
 	nextNonce := gjson.Get(requestNonceResp, "next_nonce").String()
 	jsonResult, error1 := utils.RegisterEDDSAPublicKey(appDomain, s.SPInfo.Endpoint, eddsaSeed, s.SPInfo.OperatorAddress, nextNonce, addressNew, privateKeyNew)

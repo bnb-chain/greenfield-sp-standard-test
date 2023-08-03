@@ -28,6 +28,28 @@ func HttpGetWithHeader(url string, header map[string]string) (string, error) {
 	return string(body), err
 }
 
+func HttpGetWithHeaders(url string, header map[string]string) (http.Header, string, error) {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return req.Header, "", err
+	}
+	for key, value := range header {
+		req.Header.Set(key, value)
+	}
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if nil != resp.Body {
+		defer resp.Body.Close()
+	} else {
+		return resp.Header, "{}", err
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return resp.Header, "", err
+	}
+
+	return resp.Header, string(body), err
+}
 func HttpPost(url string, jsonStr string) (string, error) {
 	var json = []byte(jsonStr)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(json))
@@ -74,4 +96,28 @@ func HttpPostWithHeader(url string, jsonStr string, header map[string]string) (s
 		return "", err
 	}
 	return string(body), err
+}
+func HttpPostWithHeaders(url string, jsonStr string, header map[string]string) (http.Header, string, error) {
+	var json = []byte(jsonStr)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(json))
+	if err != nil {
+		return req.Header, "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	for key, value := range header {
+		req.Header.Set(key, value)
+	}
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return resp.Header, "", err
+	}
+	if (nil != resp) && (nil != resp.Body) {
+		defer resp.Body.Close()
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return resp.Header, "", err
+	}
+	return resp.Header, string(body), err
 }

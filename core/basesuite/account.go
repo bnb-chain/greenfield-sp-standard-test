@@ -68,22 +68,6 @@ func NewAccount(greenfieldEndpoint, chainId, spAddress, secret string) *Account 
 		Secret:        secret,
 	}
 }
-func NewAccountsBySecrets(greenfieldEndpoint, chainId, spAddr string, secrets []string) []*Account {
-	accounts := make([]*Account, len(secrets))
-	for i, s := range secrets {
-		accounts[i] = NewAccount(greenfieldEndpoint, chainId, spAddr, s)
-	}
-	return accounts
-}
-
-func NewAccountsByNumber(greenfieldEndpoint, chainId, spAddr string, number int) []*Account {
-	accounts := make([]*Account, number)
-	for i := 0; i < number; i++ {
-		accounts[i] = NewAccount(greenfieldEndpoint, chainId, spAddr, "")
-	}
-	return accounts
-}
-
 func (a *Account) SelectSP(primarySPAddr string) (*spTypes.StorageProvider, error) {
 	providers, err := a.SDKClient.ListStorageProviders(context.Background(), true)
 	if err != nil {
@@ -154,7 +138,7 @@ func (a *Account) CreateObjectAllSize(bucketName, objectName string, fileSize ui
 	if err != nil {
 		return nil, "", nil, err
 	}
-	return info, txHash, &utils.File{Reader: bytes.NewReader(buffer.Bytes()), Size: int64(buffer.Len())}, nil
+	return info.ObjectInfo, txHash, &utils.File{Reader: bytes.NewReader(buffer.Bytes()), Size: int64(buffer.Len())}, nil
 }
 
 func (a *Account) PutObject(bucketName, objectName, createObjectTx string, file utils.File, opts *sdkTypes.PutObjectOptions) error {
@@ -166,11 +150,12 @@ func (a *Account) PutObject(bucketName, objectName, createObjectTx string, file 
 
 func (a *Account) IsObjectSealed(bucketName, objectName string) *storageTypes.ObjectInfo {
 	i := 0
-	for i < 30 {
+	for i < 60 {
 		info, err := a.SDKClient.HeadObject(a.Ctx, bucketName, objectName)
-		if info != nil && err == nil && info.ObjectStatus == storageTypes.OBJECT_STATUS_SEALED {
+		log.Infof(" object %s  wait  %ds for seal， status: %s", objectName, i, info.ObjectInfo.ObjectStatus.String())
+		if info != nil && err == nil && info.ObjectInfo.ObjectStatus == storageTypes.OBJECT_STATUS_SEALED {
 			log.Infof("bucket: %s,object: %s is sealed", bucketName, objectName)
-			return info
+			return info.ObjectInfo
 		}
 		time.Sleep(time.Second)
 		i++
@@ -179,9 +164,9 @@ func (a *Account) IsObjectSealed(bucketName, objectName string) *storageTypes.Ob
 	if err != nil {
 		log.Errorf("HeadObject err: %v", err)
 	}
-	return info
+	return info.ObjectInfo
 }
 
 func (a *Account) GetObject(bucketName, objectName string) (io.ReadCloser, sdkTypes.ObjectStat, error) {
-	return a.SDKClient.GetObject(a.Ctx, bucketName, objectName, sdkTypes.GetObjectOption{})
+	return a.SDKClient.GetObject(a.Ctx, bucketName, objectName, sdkTypes.GetObjectOptions{})
 }

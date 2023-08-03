@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"net/http"
 	"time"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
@@ -25,17 +26,16 @@ const (
 	sizeFr = fr.Bytes
 )
 
-func GetNonce(userAddress string, endpoint string) (string, error) {
+func GetNonce(userAddress string, endpoint string) (http.Header, string, error) {
 	header := make(map[string]string)
 	header["X-Gnfd-User-Address"] = userAddress
 	header["X-Gnfd-App-Domain"] = "https://greenfield.bnbchain.org/"
-	response, err := HttpGetWithHeader(endpoint+"/auth/request_nonce", header)
-	return response, err
+	respHeader, response, err := HttpGetWithHeaders(endpoint+"/auth/request_nonce", header)
+	return respHeader, response, err
 }
 
-func UpdateAccountKey(SpAddress, endpoint string) (string, error) {
+func UpdateAccountKey(SpAddress, endpoint string) (http.Header, string, error) {
 	privateKeyNew, _ := crypto.GenerateKey()
-	//privateKeyNew := GetEddsaCompressedPublicKey(seed)
 
 	addressNew := crypto.PubkeyToAddress(privateKeyNew.PublicKey)
 	log.Infof("address is: %s", addressNew.Hex())
@@ -68,7 +68,7 @@ func UpdateAccountKey(SpAddress, endpoint string) (string, error) {
 	headers["authorization"] = AuthString
 	headers["origin"] = domainNew
 	headers["x-gnfd-user-address"] = User
-	return HttpPostWithHeader(endpoint+"/auth/update_key", "{}", headers)
+	return HttpPostWithHeaders(endpoint+"/auth/update_key", "{}", headers)
 }
 
 func GetEddsaCompressedPublicKey(seed string) string {

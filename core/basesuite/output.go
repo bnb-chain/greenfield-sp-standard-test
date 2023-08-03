@@ -12,6 +12,13 @@ type Output struct {
 	Time time.Duration
 }
 
+func (s *BaseSuite) NewOutput(name string, err error, beginTime time.Time) {
+	if err != nil {
+		name = name + err.Error()
+	}
+	s.TestResults = append(s.TestResults, Output{Name: name, Time: time.Since(beginTime)})
+}
+
 func (s *BaseSuite) PrintTestResult() {
 	var mutex sync.Mutex
 	m := map[string]map[string]time.Duration{}
@@ -59,11 +66,4 @@ func (s *BaseSuite) PrintTestResult() {
 		}
 	}()
 
-}
-
-func (s *BaseSuite) NewOutput(name string, err error, beginTime time.Time) {
-	if err != nil {
-		name = name + err.Error()
-	}
-	s.TestResults = append(s.TestResults, Output{Name: name, Time: time.Since(beginTime)})
 }

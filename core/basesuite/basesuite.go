@@ -55,7 +55,7 @@ func (s *BaseSuite) InitAccountsBNBBalance(accounts []*Account, amount int64) {
 			}
 			log.Infof("Transfer BNB to: %s, tx hash: %v", normalAccount.Addr.String(), transferTxHash)
 			txInfo, err := s.RootAcc.SDKClient.WaitForTx(context.Background(), transferTxHash)
-			if err != nil || txInfo.Code != 0 {
+			if err != nil || txInfo.TxResult.Code != 0 {
 				log.Errorf("root account Transfer WaitForTx err: %v", err)
 			}
 		}

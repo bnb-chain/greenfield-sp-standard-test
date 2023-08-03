@@ -23,6 +23,8 @@ type Config struct {
 	NumUsers int    `yaml:"NumUsers"`
 	Upload   bool   `yaml:"Upload"`
 	Download bool   `yaml:"Download"`
+
+	HttpHeaders map[string]string `yaml:"HttpHeaders"`
 }
 
 var CfgEnv Config
