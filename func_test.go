@@ -60,6 +60,7 @@ func (s *SPFunctionalTestSuite) Test_00_UploadMultiSizeFile() {
 	for _, tc := range testCases {
 		s.Run(tc.name, func() {
 			objectName := utils.GetRandomObjectName()
+
 			_, tx, file, err := testAccount.CreateObjectAllSize(bucketName, objectName, tc.fileSize, nil)
 			s.NoError(err)
 			log.Infof("Created object - file size: %d bytes, endpoint: %s, tx: %v", tc.fileSize, s.SPInfo.Endpoint, tx)
@@ -70,7 +71,7 @@ func (s *SPFunctionalTestSuite) Test_00_UploadMultiSizeFile() {
 
 			log.Infof("Waiting for seal - object: %s, bucket: %v", objectName, bucketName)
 			info := testAccount.IsObjectSealed(bucketName, objectName)
-			s.Equal(info.ObjectStatus, storageTypes.OBJECT_STATUS_SEALED, fmt.Sprintf("===ObjectSealed failed - endpoint: %s, status: %s===", s.SPInfo.Endpoint, info.ObjectStatus.String()))
+			s.Equal(info.ObjectStatus.String(), storageTypes.OBJECT_STATUS_SEALED.String(), fmt.Sprintf("===ObjectSealed failed - endpoint: %s, status: %s===", s.SPInfo.Endpoint, info.ObjectStatus.String()))
 			time.Sleep(time.Second * 10)
 			log.Infof("Downloading file - object: %s, bucket: %v", objectName, bucketName)
 			fileDownLoad, info2, err := testAccount.GetObject(bucketName, objectName)
@@ -312,13 +313,12 @@ func (s *SPFunctionalTestSuite) Test_09_ListGroupByNameAndPrefix() {
 }
 
 func (s *SPFunctionalTestSuite) Test_10_UpdateAccountKey() {
-	respHeader, res, err := utils.UpdateAccountKey(s.SPInfo.OperatorAddress, s.SPInfo.Endpoint)
+	domain := "https://greenfield.bnbchain.org/"
+	respHeader, res, err := utils.UpdateAccountKey(s.SPInfo.OperatorAddress, domain, s.SPInfo.Endpoint)
 	s.NoError(err, "call /auth/update_key")
 	s.True(strings.Contains(res, "true"))
-	for headerKey, headerValue := range config.CfgEnv.HttpHeaders {
-		keyValues := respHeader.Get(headerKey)
-		s.Equal(keyValues, headerValue, "need contain headers support cross origin")
-	}
+	log.Infof("respHeader: %v", respHeader)
+	s.True(utils.CheckHttpHeader(respHeader, domain, config.CfgEnv.HttpHeaders))
 }
 
 func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
@@ -356,25 +356,24 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 	time.Sleep(3 * time.Second)
 	// case 1: access universal endpoint from non-browser;
 	header := make(map[string]string)
-	response, err := utils.HttpGetWithHeader(publicUniversalEndpoint, header)
+	_, response, err := utils.HttpGetWithHeaders(publicUniversalEndpoint, header)
 	s.NoError(err)
 	log.Debugf(" publicUniversalEndpoint Response is :%v, error is %v", response, err)
 	s.True(len(response) == int(fileSize), response) // the response size is 1, as the upload file size is 1b
-
+	domain := "https://greenfield.bnbchain.org/"
+	header["origin"] = domain
 	// case 2: access universal endpoint from public object
 	header["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/114.0" //
 	respHeader, response, err := utils.HttpGetWithHeaders(publicUniversalEndpoint, header)
 	log.Debugf("respHeader: %v", respHeader)
-	for headerKey, headerValue := range config.CfgEnv.HttpHeaders {
-		keyValues := respHeader.Get(headerKey)
-		s.Equal(keyValues, headerValue, "need contain headers support cross origin")
-	}
+	s.True(utils.CheckHttpHeader(respHeader, domain, config.CfgEnv.HttpHeaders))
+
 	log.Debugf("publicUniversalEndpoint response: %s", response)
 	s.NoError(err)
 	s.True(!strings.Contains(response, "error"))
 
 	// case 3: access universal endpoint without auth string from browser; expect to get a build-in dapp HTML
-	response, err = utils.HttpGetWithHeader(privateUniversalEndpoint, header)
+	_, response, err = utils.HttpGetWithHeaders(privateUniversalEndpoint, header)
 	log.Debugf("access universal endpoint without auth string, from browser,  Response is :%v, error is %v", response, err)
 	s.True(strings.Contains(response, "<!doctype html><html")) // <!doctype html><html....
 
@@ -389,7 +388,7 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 	signString := utils.ConvertToString(sig)
 	universalEndpointWithPersonalSig := fmt.Sprintf("%s?expiry=%s&signature=%s", privateUniversalEndpoint, expiryStr, signString)
 	log.Debugf("universalEndpointWithPersonalSig is: " + universalEndpointWithPersonalSig)
-	response, err = utils.HttpGetWithHeader(universalEndpointWithPersonalSig, header)
+	_, response, err = utils.HttpGetWithHeaders(universalEndpointWithPersonalSig, header)
 	log.Debugf("universalEndpointWithPersonalSig Response is :%v, error is %v", response, err)
 	s.True(len(response) == int(fileSize), response)
 
@@ -423,7 +422,7 @@ func (s *SPFunctionalTestSuite) Test_12_OffChainAuth() {
 	header["X-Gnfd-User-Address"] = userAddress
 	header["X-Gnfd-App-Domain"] = appDomain
 	header["Authorization"] = authString
-	response, error1 := utils.HttpGetWithHeader(s.SPInfo.Endpoint, header)
+	_, response, error1 := utils.HttpGetWithHeaders(s.SPInfo.Endpoint, header)
 	log.Infof("getUserBucket Response is :%v, error is %v", response, error1)
 	s.True(strings.Contains(response, "\"buckets\":["), "response not contains buckets")
 	s.NoError(error1, "call getUserBucketError error")

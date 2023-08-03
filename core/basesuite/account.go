@@ -150,9 +150,9 @@ func (a *Account) PutObject(bucketName, objectName, createObjectTx string, file 
 
 func (a *Account) IsObjectSealed(bucketName, objectName string) *storageTypes.ObjectInfo {
 	i := 0
-	for i < 60 {
+	for i < 360 {
 		info, err := a.SDKClient.HeadObject(a.Ctx, bucketName, objectName)
-		log.Infof(" object %s  wait  %ds for seal， status: %s", objectName, i, info.ObjectInfo.ObjectStatus.String())
+		log.Infof(" bucketName %s object %s  wait  %ds for seal， status: %s", bucketName, objectName, i, info.ObjectInfo.ObjectStatus.String())
 		if info != nil && err == nil && info.ObjectInfo.ObjectStatus == storageTypes.OBJECT_STATUS_SEALED {
 			log.Infof("bucket: %s,object: %s is sealed", bucketName, objectName)
 			return info.ObjectInfo

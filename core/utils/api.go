@@ -34,7 +34,7 @@ func GetNonce(userAddress string, endpoint string) (http.Header, string, error) 
 	return respHeader, response, err
 }
 
-func UpdateAccountKey(SpAddress, endpoint string) (http.Header, string, error) {
+func UpdateAccountKey(SpAddress, domainNew, endpoint string) (http.Header, string, error) {
 	privateKeyNew, _ := crypto.GenerateKey()
 
 	addressNew := crypto.PubkeyToAddress(privateKeyNew.PublicKey)
@@ -45,7 +45,6 @@ func UpdateAccountKey(SpAddress, endpoint string) (http.Header, string, error) {
 	edcsaSig, _ := crypto.Sign(unSignedContentHash, privateKeyNew)
 	userEddsaPublicKeyStr := GetEddsaCompressedPublicKey(string(edcsaSig))
 	log.Infof("userEddsaPublicKeyStr is %s", userEddsaPublicKeyStr)
-	domainNew := "https://greenfield.bnbchain.org/"
 
 	PublicKeyString := userEddsaPublicKeyStr
 	ExpiryDate := time.Now().Add(time.Hour * 24).Format(time.RFC3339)
@@ -175,7 +174,7 @@ func RegisterEDDSAPublicKey(appDomain, endpoint, eddsaSeed, SpAddress, requestNo
 	headers["authorization"] = AuthString
 	headers["origin"] = "https://greenfield.bnbchain.org/"
 	headers["x-gnfd-user-address"] = User
-	jsonResult, error1 := HttpPostWithHeader(endpoint+"/auth/update_key", "{}", headers)
+	_, jsonResult, error1 := HttpPostWithHeaders(endpoint+"/auth/update_key", "{}", headers)
 
 	return jsonResult, error1
 }
