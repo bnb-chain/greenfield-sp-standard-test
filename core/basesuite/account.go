@@ -152,10 +152,16 @@ func (a *Account) IsObjectSealed(bucketName, objectName string) *storageTypes.Ob
 	i := 0
 	for i < 360 {
 		info, err := a.SDKClient.HeadObject(a.Ctx, bucketName, objectName)
-		log.Infof(" bucketName %s object %s  wait  %ds for seal， status: %s", bucketName, objectName, i, info.ObjectInfo.ObjectStatus.String())
-		if info != nil && err == nil && info.ObjectInfo.ObjectStatus == storageTypes.OBJECT_STATUS_SEALED {
-			log.Infof("bucket: %s,object: %s is sealed", bucketName, objectName)
-			return info.ObjectInfo
+		if err != nil {
+			log.Errorf("HeadObject error: %v", err)
+			continue
+		}
+		if info != nil && info.ObjectInfo != nil {
+			log.Infof(" bucketName %s object %s  wait  %ds for seal， status: %s", bucketName, objectName, i, info.ObjectInfo.ObjectStatus.String())
+			if info.ObjectInfo != nil && info.ObjectInfo.ObjectStatus == storageTypes.OBJECT_STATUS_SEALED {
+				log.Infof("bucket: %s,object: %s is sealed", bucketName, objectName)
+				return info.ObjectInfo
+			}
 		}
 		time.Sleep(time.Second)
 		i++
