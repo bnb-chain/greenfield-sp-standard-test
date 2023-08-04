@@ -26,7 +26,7 @@ const (
 	sizeFr = fr.Bytes
 )
 
-func GetNonce(userAddress string, endpoint string) (http.Header, string, error) {
+func GetNonce(userAddress string, endpoint string) (*http.Header, string, error) {
 	header := make(map[string]string)
 	header["X-Gnfd-User-Address"] = userAddress
 	header["X-Gnfd-App-Domain"] = "https://greenfield.bnbchain.org/"
@@ -34,7 +34,7 @@ func GetNonce(userAddress string, endpoint string) (http.Header, string, error) 
 	return respHeader, response, err
 }
 
-func UpdateAccountKey(SpAddress, domainNew, endpoint string) (http.Header, string, error) {
+func UpdateAccountKey(SpAddress, domainNew, endpoint string) (*http.Header, string, error) {
 	privateKeyNew, _ := crypto.GenerateKey()
 
 	addressNew := crypto.PubkeyToAddress(privateKeyNew.PublicKey)

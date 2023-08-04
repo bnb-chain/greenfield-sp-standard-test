@@ -24,7 +24,8 @@ func (s *BaseSuite) SetupSuite() {
 	if err != nil {
 		log.Errorf("Error getting account balance: %v", err)
 	}
-	log.Infof("rootAccountBalance: %v , root account : %s", rootAccountBalance.Amount, s.RootAcc.Addr.String())
+	bal := rootAccountBalance.Amount.QuoRaw(1e15).Int64()
+	log.Infof("rootAccountBalance: %vBNB , root account : %s", float64(bal)/1e3, s.RootAcc.Addr.String())
 	if rootAccountBalance.Amount.LT(math.NewInt(1e18)) {
 		log.Fatalf("rootAccount balance less 1BNB, need more BNB balance for test")
 	}

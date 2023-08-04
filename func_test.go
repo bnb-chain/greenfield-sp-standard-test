@@ -89,7 +89,7 @@ func (s *SPFunctionalTestSuite) Test_00_UploadMultiSizeFile() {
 
 			fileHash := hex.EncodeToString(hashA.Sum(nil))
 			downloadHash := hex.EncodeToString(hashB.Sum(nil))
-			s.Equal(fileHash, downloadHash, "hash is not the same")
+			s.Equal(fileHash, downloadHash, "Downloading file hash check failed")
 		})
 	}
 }
@@ -318,7 +318,7 @@ func (s *SPFunctionalTestSuite) Test_10_UpdateAccountKey() {
 	s.NoError(err, "call /auth/update_key")
 	s.True(strings.Contains(res, "true"))
 	log.Infof("respHeader: %v", respHeader)
-	s.True(utils.CheckHttpHeader(respHeader, domain, config.CfgEnv.HttpHeaders))
+	s.True(utils.CheckHttpHeader(*respHeader, domain, config.CfgEnv.HttpHeaders))
 }
 
 func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
@@ -366,7 +366,7 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 	header["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/114.0" //
 	respHeader, response, err := utils.HttpGetWithHeaders(publicUniversalEndpoint, header)
 	log.Debugf("respHeader: %v", respHeader)
-	s.True(utils.CheckHttpHeader(respHeader, domain, config.CfgEnv.HttpHeaders))
+	s.True(utils.CheckHttpHeader(*respHeader, domain, config.CfgEnv.HttpHeaders))
 
 	log.Debugf("publicUniversalEndpoint response: %s", response)
 	s.NoError(err)
@@ -400,6 +400,7 @@ func (s *SPFunctionalTestSuite) Test_12_OffChainAuth() {
 	addressNew := crypto.PubkeyToAddress(privateKeyNew.PublicKey)
 	// 1. user browser seed string, which is the eddsa private key
 	eddsaSeed := "test_seed"
+
 	// 2. registerEDDSAPublicKey
 	_, requestNonceResp, err := utils.GetNonce(addressNew.Hex(), s.SPInfo.Endpoint)
 	s.NoError(err)
