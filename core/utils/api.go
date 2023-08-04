@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"net/http"
 	"time"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
@@ -25,17 +26,16 @@ const (
 	sizeFr = fr.Bytes
 )
 
-func GetNonce(userAddress string, endpoint string) (string, error) {
+func GetNonce(userAddress string, endpoint string) (*http.Header, string, error) {
 	header := make(map[string]string)
 	header["X-Gnfd-User-Address"] = userAddress
 	header["X-Gnfd-App-Domain"] = "https://greenfield.bnbchain.org/"
-	response, err := HttpGetWithHeader(endpoint+"/auth/request_nonce", header)
-	return response, err
+	respHeader, response, err := HttpGetWithHeaders(endpoint+"/auth/request_nonce", header)
+	return respHeader, response, err
 }
 
-func UpdateAccountKey(SpAddress, endpoint string) (string, error) {
+func UpdateAccountKey(SpAddress, domainNew, endpoint string) (*http.Header, string, error) {
 	privateKeyNew, _ := crypto.GenerateKey()
-	//privateKeyNew := GetEddsaCompressedPublicKey(seed)
 
 	addressNew := crypto.PubkeyToAddress(privateKeyNew.PublicKey)
 	log.Infof("address is: %s", addressNew.Hex())
@@ -45,7 +45,6 @@ func UpdateAccountKey(SpAddress, endpoint string) (string, error) {
 	edcsaSig, _ := crypto.Sign(unSignedContentHash, privateKeyNew)
 	userEddsaPublicKeyStr := GetEddsaCompressedPublicKey(string(edcsaSig))
 	log.Infof("userEddsaPublicKeyStr is %s", userEddsaPublicKeyStr)
-	domainNew := "https://greenfield.bnbchain.org/"
 
 	PublicKeyString := userEddsaPublicKeyStr
 	ExpiryDate := time.Now().Add(time.Hour * 24).Format(time.RFC3339)
@@ -68,7 +67,7 @@ func UpdateAccountKey(SpAddress, endpoint string) (string, error) {
 	headers["authorization"] = AuthString
 	headers["origin"] = domainNew
 	headers["x-gnfd-user-address"] = User
-	return HttpPostWithHeader(endpoint+"/auth/update_key", "{}", headers)
+	return HttpPostWithHeaders(endpoint+"/auth/update_key", "{}", headers)
 }
 
 func GetEddsaCompressedPublicKey(seed string) string {
@@ -175,7 +174,7 @@ func RegisterEDDSAPublicKey(appDomain, endpoint, eddsaSeed, SpAddress, requestNo
 	headers["authorization"] = AuthString
 	headers["origin"] = "https://greenfield.bnbchain.org/"
 	headers["x-gnfd-user-address"] = User
-	jsonResult, error1 := HttpPostWithHeader(endpoint+"/auth/update_key", "{}", headers)
+	_, jsonResult, error1 := HttpPostWithHeaders(endpoint+"/auth/update_key", "{}", headers)
 
 	return jsonResult, error1
 }

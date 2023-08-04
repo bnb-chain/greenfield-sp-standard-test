@@ -24,7 +24,8 @@ func (s *BaseSuite) SetupSuite() {
 	if err != nil {
 		log.Errorf("Error getting account balance: %v", err)
 	}
-	log.Infof("rootAccountBalance: %v , root account : %s", rootAccountBalance.Amount, s.RootAcc.Addr.String())
+	bal := rootAccountBalance.Amount.QuoRaw(1e15).Int64()
+	log.Infof("rootAccountBalance: %vBNB , root account : %s", float64(bal)/1e3, s.RootAcc.Addr.String())
 	if rootAccountBalance.Amount.LT(math.NewInt(1e18)) {
 		log.Fatalf("rootAccount balance less 1BNB, need more BNB balance for test")
 	}
@@ -55,7 +56,7 @@ func (s *BaseSuite) InitAccountsBNBBalance(accounts []*Account, amount int64) {
 			}
 			log.Infof("Transfer BNB to: %s, tx hash: %v", normalAccount.Addr.String(), transferTxHash)
 			txInfo, err := s.RootAcc.SDKClient.WaitForTx(context.Background(), transferTxHash)
-			if err != nil || txInfo.Code != 0 {
+			if err != nil || txInfo.TxResult.Code != 0 {
 				log.Errorf("root account Transfer WaitForTx err: %v", err)
 			}
 		}

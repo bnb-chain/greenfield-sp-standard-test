@@ -115,8 +115,12 @@ func (l *Logger) Output(level int, a ...interface{}) error {
 	if level >= l.level {
 		gid := GetGID()
 		gidStr := strconv.FormatUint(gid, 10)
+		_, file, line, _ := runtime.Caller(3)
+		files := strings.Split(file, "/")
+		file = files[len(files)-1]
+
 		a = append([]interface{}{LevelName(level), "GID",
-			gidStr + ","}, a...)
+			gidStr, fmt.Sprintf("%s:%d", file, line), ","}, a...)
 		return l.logger.Output(CALL_DEPTH, fmt.Sprintln(a...))
 	}
 	return nil
@@ -124,9 +128,13 @@ func (l *Logger) Output(level int, a ...interface{}) error {
 func (l *Logger) Outputf(level int, format string, v ...interface{}) error {
 	if level >= l.level {
 		gid := GetGID()
+		_, file, line, _ := runtime.Caller(3)
+		files := strings.Split(file, "/")
+		file = files[len(files)-1]
 		v = append([]interface{}{LevelName(level), "GID",
-			gid}, v...)
-		return l.logger.Output(CALL_DEPTH, fmt.Sprintf("%s %s %d, "+format+"\n", v...))
+			gid, file, line}, v...)
+
+		return l.logger.Output(CALL_DEPTH, fmt.Sprintf("%s %s %d, %s:%d "+format+"\n", v...))
 	}
 	return nil
 }
