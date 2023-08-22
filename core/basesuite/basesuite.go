@@ -26,13 +26,13 @@ func (s *BaseSuite) SetupSuite() {
 	}
 	bal := rootAccountBalance.Amount.QuoRaw(1e15).Int64()
 	log.Infof("rootAccountBalance: %vBNB , root account : %s", float64(bal)/1e3, s.RootAcc.Addr.String())
-	if rootAccountBalance.Amount.LT(math.NewInt(1e18)) {
+	if rootAccountBalance.Amount.LT(math.NewInt(8e17)) {
 		log.Fatalf("rootAccount balance less 1BNB, need more BNB balance for test")
 	}
 
 	s.TestAcc = NewAccount(config.CfgEnv.GreenfieldEndpoint, config.CfgEnv.GreenfieldChainId, config.CfgEnv.SPAddr, config.CfgEnv.TestAcc)
 	// check test account balance
-	s.InitAccountsBNBBalance([]*Account{s.TestAcc}, 3e17)
+	s.InitAccountsBNBBalance([]*Account{s.TestAcc}, 1e16)
 
 	spAddr := config.CfgEnv.SPAddr
 	spInfo, err := s.TestAcc.SelectSP(spAddr)
