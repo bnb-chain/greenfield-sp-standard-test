@@ -53,11 +53,11 @@ func (s *SPFunctionalTestSuite) Test_00_UploadMultiSizeFile() {
 		fileSize uint64
 	}{
 		{"Put 1B file", 1},
-		//{"Put 5.99MB file", 5*1024*1024 + 888},
-		//{"Put 16MB file", 16 * 1024 * 1024},
-		//{"Put 20MB file", 20 * 1024 * 1024},
-		//{"Put 256MB file", 256*1024*1024 + 12},
-		//{"Put 1G file", 1 * 1024 * 1024 * 1024},
+		{"Put 5.99MB file", 5*1024*1024 + 888},
+		{"Put 16MB file", 16 * 1024 * 1024},
+		{"Put 20MB file", 20 * 1024 * 1024},
+		{"Put 256MB file", 256*1024*1024 + 12},
+		{"Put 1G file", 1 * 1024 * 1024 * 1024},
 	}
 
 	for _, tc := range testCases {
@@ -71,12 +71,15 @@ func (s *SPFunctionalTestSuite) Test_00_UploadMultiSizeFile() {
 			log.Infof("Uploading file - object: %s, bucket: %v", objectName, bucketName)
 			err = testAccount.PutObject(bucketName, objectName, "", *file, nil)
 			s.NoError(err, fmt.Sprintf("===Put failed - file size: %d, endpoint: %s===", tc.fileSize, s.SPInfo.Endpoint))
-
 			log.Infof("Waiting for seal - object: %s, bucket: %v", objectName, bucketName)
+
 			info := testAccount.IsObjectSealed(bucketName, objectName)
 			s.Equal(info.ObjectStatus.String(), storageTypes.OBJECT_STATUS_SEALED.String(), fmt.Sprintf("===ObjectSealed failed - endpoint: %s, status: %s===", s.SPInfo.Endpoint, info.ObjectStatus.String()))
 			time.Sleep(time.Second * 10)
 			log.Infof("Downloading file - object: %s, bucket: %v", objectName, bucketName)
+			quota, err := testAccount.SDKClient.GetBucketReadQuota(context.Background(), bucketName)
+			s.NoError(err, "GetBucketReadQuota error")
+			log.Infof("file Size: %d,BuyReadQuotaSize : %d, ReadConsumedSize: %d, SPFreeReadQuotaSize: %d", file.Reader.Size(), quota.ReadQuotaSize, quota.ReadConsumedSize, quota.SPFreeReadQuotaSize)
 			fileDownLoad, info2, err := testAccount.GetObject(bucketName, objectName)
 			s.NoError(err, fmt.Sprintf("===info2: %v, info: %v ", info2, info))
 
