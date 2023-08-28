@@ -44,7 +44,7 @@ func (s *SPFunctionalTestSuite) Test_00_UploadMultiSizeFile() {
 	bucketTx, err := testAccount.CreateBucket(bucketName, nil)
 	s.NoError(err)
 	log.Infof("Created bucket: %s, txHash: %s", bucketName, bucketTx)
-	bucket, err := testAccount.SDKClient.BuyQuotaForBucket(context.Background(), bucketName, 1024*1024*1024, sdkTypes.BuyQuotaOption{})
+	bucket, err := testAccount.SDKClient.BuyQuotaForBucket(context.Background(), bucketName, 2*1024*1024*1024, sdkTypes.BuyQuotaOption{})
 	s.NoError(err, "BuyQuotaForBucket error")
 	log.Infof("BuyQuotaForBucket bucket: %s, txHash: %s", bucketName, bucket)
 
