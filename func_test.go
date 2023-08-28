@@ -44,7 +44,7 @@ func (s *SPFunctionalTestSuite) Test_00_UploadMultiSizeFile() {
 	bucketTx, err := testAccount.CreateBucket(bucketName, nil)
 	s.NoError(err)
 	log.Infof("Created bucket: %s, txHash: %s", bucketName, bucketTx)
-	bucket, err := testAccount.SDKClient.BuyQuotaForBucket(context.Background(), bucketName, 1024*1024*1024, sdkTypes.BuyQuotaOption{})
+	bucket, err := testAccount.SDKClient.BuyQuotaForBucket(context.Background(), bucketName, 2*1024*1024*1024, sdkTypes.BuyQuotaOption{})
 	s.NoError(err, "BuyQuotaForBucket error")
 	log.Infof("BuyQuotaForBucket bucket: %s, txHash: %s", bucketName, bucket)
 
@@ -71,12 +71,15 @@ func (s *SPFunctionalTestSuite) Test_00_UploadMultiSizeFile() {
 			log.Infof("Uploading file - object: %s, bucket: %v", objectName, bucketName)
 			err = testAccount.PutObject(bucketName, objectName, "", *file, nil)
 			s.NoError(err, fmt.Sprintf("===Put failed - file size: %d, endpoint: %s===", tc.fileSize, s.SPInfo.Endpoint))
-
 			log.Infof("Waiting for seal - object: %s, bucket: %v", objectName, bucketName)
+
 			info := testAccount.IsObjectSealed(bucketName, objectName)
 			s.Equal(info.ObjectStatus.String(), storageTypes.OBJECT_STATUS_SEALED.String(), fmt.Sprintf("===ObjectSealed failed - endpoint: %s, status: %s===", s.SPInfo.Endpoint, info.ObjectStatus.String()))
 			time.Sleep(time.Second * 10)
 			log.Infof("Downloading file - object: %s, bucket: %v", objectName, bucketName)
+			quota, err := testAccount.SDKClient.GetBucketReadQuota(context.Background(), bucketName)
+			s.NoError(err, "GetBucketReadQuota error")
+			log.Infof("file Size: %d,BuyReadQuotaSize : %d, ReadConsumedSize: %d, SPFreeReadQuotaSize: %d", file.Reader.Size(), quota.ReadQuotaSize, quota.ReadConsumedSize, quota.SPFreeReadQuotaSize)
 			fileDownLoad, info2, err := testAccount.GetObject(bucketName, objectName)
 			s.NoError(err, fmt.Sprintf("===info2: %v, info: %v ", info2, info))
 
@@ -115,7 +118,7 @@ func (s *SPFunctionalTestSuite) Test_01_DeleteObjectBucket() {
 
 	// Check if object is sealed
 	objectInfo := testAccount.IsObjectSealed(bucketName, objectName)
-	s.Equal(storageTypes.OBJECT_STATUS_SEALED, objectInfo.ObjectStatus, "object not sealed")
+	s.Equal(storageTypes.OBJECT_STATUS_SEALED.String(), objectInfo.ObjectStatus.String(), "object not sealed")
 
 	// Delete object
 	deleteObjectOption := sdkTypes.DeleteObjectOption{}
@@ -174,7 +177,7 @@ func (s *SPFunctionalTestSuite) Test_02_CheckDownloadQuota() {
 
 	// Check if object is sealed
 	objectInfo := testAccount.IsObjectSealed(bucketName, objectName)
-	s.Equal(storageTypes.OBJECT_STATUS_SEALED, objectInfo.ObjectStatus, "object not sealed")
+	s.Equal(storageTypes.OBJECT_STATUS_SEALED.String(), objectInfo.ObjectStatus.String(), "object not sealed")
 
 	// Check read quota records before downloading
 	timesBefore := time.Now().UnixMilli()
@@ -238,7 +241,7 @@ func (s *SPFunctionalTestSuite) Test_04_VerifyAuth() {
 	s.NoError(err)
 
 	objectInfo := testAccountB.IsObjectSealed(bucketName, objectName2)
-	s.Equal(storageTypes.OBJECT_STATUS_SEALED, objectInfo.ObjectStatus, "Object not sealed")
+	s.Equal(storageTypes.OBJECT_STATUS_SEALED.String(), objectInfo.ObjectStatus.String(), "Object not sealed")
 
 	// Attempt to get object from testAccountB (should fail)
 	fileDownLoad, _, err := testAccountB.GetObject(bucketName, objectName2)
@@ -270,7 +273,7 @@ func (s *SPFunctionalTestSuite) Test_06_GetNonce() {
 	userAddress := s.TestAcc.Addr.String()
 	respHeader, response, err := utils.GetNonce(userAddress, s.SPInfo.Endpoint)
 	log.Debugf("GetNonce response: %v", response)
-	log.Debugf("respHeader: %v", respHeader)
+	log.Infof("respHeader: %v", respHeader)
 
 	s.NoError(err, "call /auth/request_nonce error")
 	s.NotEmpty(response)
@@ -342,7 +345,7 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 
 	// Check if private object is sealed
 	objectInfo := testAccount.IsObjectSealed(bucketName, privateObjectName)
-	s.Require().Equal(storageTypes.OBJECT_STATUS_SEALED, objectInfo.ObjectStatus, "private object not sealed")
+	s.Require().Equal(storageTypes.OBJECT_STATUS_SEALED.String(), objectInfo.ObjectStatus.String(), "private object not sealed")
 
 	// Create and upload public object
 	err = testAccount.CreateAndUploadObject(bucketName, publicObjectName, fileSize, storageTypes.VISIBILITY_TYPE_PUBLIC_READ)
@@ -350,7 +353,7 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 
 	// Check if public object is sealed
 	objectInfo2 := testAccount.IsObjectSealed(bucketName, publicObjectName)
-	s.Require().Equal(storageTypes.OBJECT_STATUS_SEALED, objectInfo2.ObjectStatus, "public object not sealed")
+	s.Require().Equal(storageTypes.OBJECT_STATUS_SEALED.String(), objectInfo2.ObjectStatus.String(), "public object not sealed")
 
 	publicUniversalEndpoint := fmt.Sprintf("%s/view/%s/%s", s.SPInfo.Endpoint, bucketName, publicObjectName)
 	privateUniversalEndpoint := fmt.Sprintf("%s/download/%s/%s", s.SPInfo.Endpoint, bucketName, privateObjectName)
