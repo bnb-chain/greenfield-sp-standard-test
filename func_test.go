@@ -6,17 +6,20 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
 
+	sdkClient "github.com/bnb-chain/greenfield-go-sdk/client"
 	"github.com/bnb-chain/greenfield-sp-standard-test/config"
-	"github.com/consensys/gnark-crypto/ecc/bn254/fr/mimc"
 	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/suite"
-	"github.com/tidwall/gjson"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
+	httplib "github.com/bnb-chain/greenfield-common/go/http"
 	sdkTypes "github.com/bnb-chain/greenfield-go-sdk/types"
 	"github.com/bnb-chain/greenfield-sp-standard-test/core/basesuite"
 	"github.com/bnb-chain/greenfield-sp-standard-test/core/log"
@@ -54,10 +57,10 @@ func (s *SPFunctionalTestSuite) Test_00_UploadMultiSizeFile() {
 	}{
 		{"Put 1B file", 1},
 		{"Put 5.99MB file", 5*1024*1024 + 888},
-		//{"Put 16MB file", 16 * 1024 * 1024},
-		//{"Put 20MB file", 20 * 1024 * 1024},
-		//{"Put 256MB file", 256*1024*1024 + 12},
-		//{"Put 1G file", 1 * 1024 * 1024 * 1024},
+		{"Put 16MB file", 16 * 1024 * 1024},
+		{"Put 20MB file", 20 * 1024 * 1024},
+		{"Put 256MB file", 256*1024*1024 + 12},
+		{"Put 1G file", 1 * 1024 * 1024 * 1024},
 	}
 
 	for _, tc := range testCases {
@@ -278,6 +281,8 @@ func (s *SPFunctionalTestSuite) Test_06_GetNonce() {
 	s.NoError(err, "call /auth/request_nonce error")
 	s.NotEmpty(response)
 	s.True(strings.Contains(response, "NextNonce"))
+	s.True(utils.CheckHttpHeader(*respHeader, "https://greenfield.bnbchain.org", config.CfgEnv.HttpHeaders))
+
 }
 
 func (s *SPFunctionalTestSuite) Test_08_BucketsByIdsObjectsByIds() {
@@ -318,14 +323,14 @@ func (s *SPFunctionalTestSuite) Test_09_ListGroupByNameAndPrefix() {
 	s.NoError(err, "ListGroupsByNameAndPrefix error")
 }
 
-// TODO: fix
-func (s *SPFunctionalTestSuite) Test_10_UpdateAccountKey() {
-	domain := "https://greenfield.bnbchain.org/"
-	respHeader, res, err := utils.UpdateAccountKey(s.SPInfo.OperatorAddress, domain, s.SPInfo.Endpoint)
-	s.NoError(err, "call /auth/update_key")
-	s.True(strings.Contains(res, "true"))
-	log.Infof("respHeader: %v", respHeader)
-	s.True(utils.CheckHttpHeader(*respHeader, domain, config.CfgEnv.HttpHeaders))
+func (s *SPFunctionalTestSuite) Test_10_SystemStatus() {
+	//	https://gf-stagenet-sp-f.bk.nodereal.cc/status
+	statusUrl := fmt.Sprintf("%s/status", s.SPInfo.Endpoint)
+	headers, statusInfo, err := utils.HttpGetWithHeaders(statusUrl, map[string]string{})
+	s.NoError(err)
+	log.Infof("statusInfo: %v", statusInfo)
+	s.True(utils.CheckHttpHeader(*headers, "https://greenfield.bnbchain.org", config.CfgEnv.HttpHeaders))
+
 }
 
 func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
@@ -363,9 +368,10 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 	time.Sleep(5 * time.Second)
 	// case 1: access universal endpoint from non-browser;
 	header := make(map[string]string)
-	_, response, err := utils.HttpGetWithHeaders(publicUniversalEndpoint, header)
+	respHeader, response, err := utils.HttpGetWithHeaders(publicUniversalEndpoint, header)
 	log.Debugf(" publicUniversalEndpoint Response is :%v, error is %v", response, err)
 	s.True(len(response) == int(fileSize))
+	s.True(utils.CheckHttpHeader(*respHeader, "https://greenfield.bnbchain.org", config.CfgEnv.HttpHeaders))
 
 	// case 2: access universal endpoint from public object
 	header["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/114.0" //
@@ -396,38 +402,59 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 	s.True(len(response) == int(fileSize))
 
 }
-
 func (s *SPFunctionalTestSuite) Test_12_OffChainAuth() {
-	appDomain := "https://greenfield.bnbchain.org/"
-	privateKeyNew, _ := crypto.GenerateKey()
-	addressNew := crypto.PubkeyToAddress(privateKeyNew.PublicKey)
-	// 1. user browser seed string, which is the eddsa private key
-	eddsaSeed := "test_seed"
+	defaultAcct, _ := s.TestAcc.SDKClient.GetDefaultAccount()
+	offChainClient, err := sdkClient.New(config.CfgEnv.GreenfieldChainId, config.CfgEnv.GreenfieldEndpoint, sdkClient.Option{
+		DefaultAccount: defaultAcct,
+		OffChainAuthOption: &sdkClient.OffChainAuthOption{
+			Seed:                 "test_seed",
+			Domain:               "https://test.domain.com",
+			ShouldRegisterPubKey: true,
+		}, GrpcDialOption: grpc.WithTransportCredentials(insecure.NewCredentials())})
+	s.TestAcc.SDKClient = offChainClient
 
-	// 2. registerEDDSAPublicKey
-	_, requestNonceResp, err := utils.GetNonce(addressNew.Hex(), s.SPInfo.Endpoint)
+	if err != nil {
+		log.Errorf("sdk new client err: %v", err)
+		panic(err)
+	}
+
+	bucketName := utils.GetRandomBucketName()
+	objectName := utils.GetRandomObjectName()
+	fileSize := uint64(utils.RandInt64(1024, 10*1024))
+	testAccount := s.TestAcc
+
+	// Create bucket
+	bucketTx, err := testAccount.CreateBucket(bucketName, nil)
 	s.NoError(err)
-	nextNonce := gjson.Get(requestNonceResp, "next_nonce").String()
-	jsonResult, error1 := utils.RegisterEDDSAPublicKey(appDomain, s.SPInfo.Endpoint, eddsaSeed, s.SPInfo.OperatorAddress, nextNonce, addressNew, privateKeyNew)
-	s.NotEmpty(jsonResult)
-	s.True(strings.Contains(jsonResult, "true"))
-	s.NoError(error1, "call /auth/update_key")
+	log.Infof("Created bucket: %s, txHash: %s", bucketName, bucketTx)
 
-	sk, _ := utils.GenerateEddsaPrivateKey(eddsaSeed)
-	unSignedMsg := fmt.Sprintf("InvokeListBucketsAPI_%v", time.Now().Add(time.Minute*2).UnixMilli())
-	hFunc := mimc.NewMiMC()
+	// Create and upload object
+	_, res, file, err := testAccount.CreateObjectAllSize(bucketName, objectName, fileSize, nil)
+	s.NoError(err)
+	err = testAccount.PutObject(bucketName, objectName, res, *file, nil)
+	s.NoError(err)
 
-	sig, _ := sk.Sign([]byte(unSignedMsg), hFunc)
-	authString := fmt.Sprintf("OffChainAuth EDDSA,SignedMsg=%v,Signature=%v", unSignedMsg, hex.EncodeToString(sig))
+	// Check if object is sealed
+	objectInfo := testAccount.IsObjectSealed(bucketName, objectName)
+	s.Equal(storageTypes.OBJECT_STATUS_SEALED, objectInfo.ObjectStatus, "object not sealed")
 
-	// 3. invoke list user buckets
-	userAddress := addressNew.Hex()
-	header := make(map[string]string)
-	header["X-Gnfd-User-Address"] = userAddress
-	header["X-Gnfd-App-Domain"] = appDomain
-	header["Authorization"] = authString
-	_, response, error1 := utils.HttpGetWithHeaders(s.SPInfo.Endpoint, header)
-	log.Infof("getUserBucket Response is :%v, error is %v", response, error1)
-	s.True(strings.Contains(response, "\"buckets\":["), "response not contains buckets")
-	s.NoError(error1, "call getUserBucketError error")
+	time.Sleep(5 * time.Second)
+	// download file in a pre-signed way by calling getObject API
+
+	getObjectEndpoint := fmt.Sprintf("%s/%s/%s", s.SPInfo.Endpoint, bucketName, objectName)
+
+	ExpiryDateFormat := "2006-01-02T15:04:05Z"
+	expiryStr := time.Now().Add(time.Minute * 4).Format(ExpiryDateFormat)
+
+	getObjectEndpointWithPresignedParams := fmt.Sprintf("%s?X-Gnfd-Expiry-Timestamp=%s&X-Gnfd-User-Address=%s&X-Gnfd-App-Domain=%s", getObjectEndpoint, expiryStr, defaultAcct.GetAddress().String(), "https://test.domain.com")
+	log.Debugf("getObjectEndpointWithPreSignedParams is: " + getObjectEndpointWithPresignedParams)
+	req, err := http.NewRequest(http.MethodGet, getObjectEndpointWithPresignedParams, nil)
+	unsignedMsg := httplib.GetMsgToSignInGNFD1AuthForPreSignedURL(req)
+	authStr := testAccount.SDKClient.OffChainAuthSign(unsignedMsg)
+	getObjectEndpointWithPresignedParams = getObjectEndpointWithPresignedParams + "&Authorization=" + url.QueryEscape(authStr)
+	log.Infof("getObjectEndpointWithPresignedParams is %s", getObjectEndpointWithPresignedParams)
+
+	_, fileDownLoadStr, err := utils.HttpGetWithHeaders(getObjectEndpointWithPresignedParams, make(map[string]string))
+	log.Infof("access getObjectEndpoint with auth preSignedURL, from browser,  Response is :%v, error is %v", fileDownLoadStr, err)
+	s.True(len(fileDownLoadStr) == int(fileSize))
 }

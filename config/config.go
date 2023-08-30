@@ -35,7 +35,7 @@ func init() {
 
 func InitConfig() {
 	pwd, _ := os.Getwd()
-	cfgPath := filepath.Join(pwd, "config", "config.yml")
+	cfgPath := filepath.Join(pwd, "config", "config_qa.yml")
 	LoadConfig(cfgPath, &CfgEnv)
 }
 
