@@ -63,7 +63,7 @@ func UpdateAccountKey(SpAddress, domainNew, endpoint string) (*http.Header, stri
 	headers["x-gnfd-app-domain"] = domainNew
 	headers["x-gnfd-app-reg-nonce"] = requestNonce
 	headers["x-gnfd-app-reg-public-key"] = PublicKeyString
-	headers["x-gnfd-app-reg-expiry-date"] = ExpiryDate
+	headers["X-Gnfd-Expiry-Timestamp"] = ExpiryDate
 	headers["authorization"] = AuthString
 	headers["origin"] = domainNew
 	headers["x-gnfd-user-address"] = User
@@ -170,7 +170,7 @@ func RegisterEDDSAPublicKey(appDomain, endpoint, eddsaSeed, SpAddress, requestNo
 	headers["x-gnfd-app-domain"] = appDomain
 	headers["x-gnfd-app-reg-nonce"] = requestNonce
 	headers["x-gnfd-app-reg-public-key"] = publicKeyString
-	headers["x-gnfd-app-reg-expiry-date"] = ExpiryDate
+	headers["X-Gnfd-Expiry-Timestamp"] = ExpiryDate
 	headers["authorization"] = AuthString
 	headers["origin"] = "https://greenfield.bnbchain.org/"
 	headers["x-gnfd-user-address"] = User

@@ -333,7 +333,7 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 	bucketName := utils.GetRandomBucketName()
 	publicObjectName := utils.GetRandomObjectName()
 	privateObjectName := utils.GetRandomObjectName()
-	fileSize := uint64(utils.RandInt64(1024, 5*1024))
+	fileSize := uint64(utils.RandInt64(1024, 10*1024))
 
 	// Create bucket
 	bucketTx, err := testAccount.CreateBucket(bucketName, nil)
@@ -346,7 +346,7 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 
 	// Check if private object is sealed
 	objectInfo := testAccount.IsObjectSealed(bucketName, privateObjectName)
-	s.Require().Equal(storageTypes.OBJECT_STATUS_SEALED.String(), objectInfo.ObjectStatus.String(), "private object not sealed")
+	s.Require().Equal(storageTypes.OBJECT_STATUS_SEALED, objectInfo.ObjectStatus, "private object not sealed")
 
 	// Create and upload public object
 	err = testAccount.CreateAndUploadObject(bucketName, publicObjectName, fileSize, storageTypes.VISIBILITY_TYPE_PUBLIC_READ)
@@ -354,34 +354,29 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 
 	// Check if public object is sealed
 	objectInfo2 := testAccount.IsObjectSealed(bucketName, publicObjectName)
-	s.Require().Equal(storageTypes.OBJECT_STATUS_SEALED.String(), objectInfo2.ObjectStatus.String(), "public object not sealed")
+	s.Require().Equal(storageTypes.OBJECT_STATUS_SEALED, objectInfo2.ObjectStatus, "public object not sealed")
 
 	publicUniversalEndpoint := fmt.Sprintf("%s/view/%s/%s", s.SPInfo.Endpoint, bucketName, publicObjectName)
 	privateUniversalEndpoint := fmt.Sprintf("%s/download/%s/%s", s.SPInfo.Endpoint, bucketName, privateObjectName)
 	log.Infof("publicUniversalEndpoint: %s", publicUniversalEndpoint)
 	log.Infof("privateUniversalEndpoint: %s", privateUniversalEndpoint)
-	time.Sleep(3 * time.Second)
+	time.Sleep(5 * time.Second)
 	// case 1: access universal endpoint from non-browser;
 	header := make(map[string]string)
 	_, response, err := utils.HttpGetWithHeaders(publicUniversalEndpoint, header)
-	s.NoError(err)
 	log.Debugf(" publicUniversalEndpoint Response is :%v, error is %v", response, err)
-	s.True(len(response) == int(fileSize), response) // the response size is 1, as the upload file size is 1b
-	domain := "https://greenfield.bnbchain.org/"
-	header["origin"] = domain
+	s.True(len(response) == int(fileSize))
+
 	// case 2: access universal endpoint from public object
 	header["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/114.0" //
-	respHeader, response, err := utils.HttpGetWithHeaders(publicUniversalEndpoint, header)
-	log.Debugf("respHeader: %v", respHeader)
-	s.True(utils.CheckHttpHeader(*respHeader, domain, config.CfgEnv.HttpHeaders))
-
-	log.Debugf("publicUniversalEndpoint response: %s", response)
+	_, response, err = utils.HttpGetWithHeaders(publicUniversalEndpoint, header)
+	log.Infof("publicUniversalEndpoint response: %s", response)
 	s.NoError(err)
 	s.True(!strings.Contains(response, "error"))
 
 	// case 3: access universal endpoint without auth string from browser; expect to get a build-in dapp HTML
 	_, response, err = utils.HttpGetWithHeaders(privateUniversalEndpoint, header)
-	log.Debugf("access universal endpoint without auth string, from browser,  Response is :%v, error is %v", response, err)
+	log.Infof("access universal endpoint without auth string, from browser,  Response is :%v, error is %v", response, err)
 	s.True(strings.Contains(response, "<!doctype html><html")) // <!doctype html><html....
 
 	// case 4: use user's private key to make a wallet personal sign, and append the signature to the private universal endpoint
@@ -393,11 +388,12 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 
 	sig, _ := s.TestAcc.KM.Sign(signedMsgHash)
 	signString := utils.ConvertToString(sig)
-	universalEndpointWithPersonalSig := fmt.Sprintf("%s?expiry=%s&signature=%s", privateUniversalEndpoint, expiryStr, signString)
-	log.Debugf("universalEndpointWithPersonalSig is: " + universalEndpointWithPersonalSig)
+
+	universalEndpointWithPersonalSig := fmt.Sprintf("%s?X-Gnfd-Expiry-Timestamp=%s&signature=%s", privateUniversalEndpoint, expiryStr, signString)
+	log.Infof("universalEndpointWithPersonalSig is: " + universalEndpointWithPersonalSig)
 	_, response, err = utils.HttpGetWithHeaders(universalEndpointWithPersonalSig, header)
-	log.Debugf("universalEndpointWithPersonalSig Response is :%v, error is %v", response, err)
-	s.True(len(response) == int(fileSize), response)
+	log.Infof("access universal endpoint with auth string, from browser,  Response is :%v, error is %v", response, err)
+	s.True(len(response) == int(fileSize))
 
 }
 

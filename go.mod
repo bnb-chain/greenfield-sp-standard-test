@@ -25,6 +25,7 @@ require (
 require (
 	github.com/consensys/gnark-crypto v0.7.0
 	github.com/panjf2000/ants/v2 v2.7.5
+	github.com/spaolacci/murmur3 v1.1.0
 	github.com/tidwall/gjson v1.14.4
 	go.uber.org/ratelimit v0.2.0
 	golang.org/x/crypto v0.10.0
