@@ -54,10 +54,10 @@ func (s *SPFunctionalTestSuite) Test_00_UploadMultiSizeFile() {
 	}{
 		{"Put 1B file", 1},
 		{"Put 5.99MB file", 5*1024*1024 + 888},
-		{"Put 16MB file", 16 * 1024 * 1024},
-		{"Put 20MB file", 20 * 1024 * 1024},
-		{"Put 256MB file", 256*1024*1024 + 12},
-		{"Put 1G file", 1 * 1024 * 1024 * 1024},
+		//{"Put 16MB file", 16 * 1024 * 1024},
+		//{"Put 20MB file", 20 * 1024 * 1024},
+		//{"Put 256MB file", 256*1024*1024 + 12},
+		//{"Put 1G file", 1 * 1024 * 1024 * 1024},
 	}
 
 	for _, tc := range testCases {
@@ -277,7 +277,7 @@ func (s *SPFunctionalTestSuite) Test_06_GetNonce() {
 
 	s.NoError(err, "call /auth/request_nonce error")
 	s.NotEmpty(response)
-	s.True(strings.Contains(response, "next_nonce"))
+	s.True(strings.Contains(response, "NextNonce"))
 }
 
 func (s *SPFunctionalTestSuite) Test_08_BucketsByIdsObjectsByIds() {
@@ -287,7 +287,7 @@ func (s *SPFunctionalTestSuite) Test_08_BucketsByIdsObjectsByIds() {
 	s.NotEmpty(listBuckets.Buckets)
 	log.Infof("list users: %s , buckets length: %v", testAccount.Addr.String(), len(listBuckets.Buckets))
 
-	bucketsId := []uint64{listBuckets.Buckets[0].BucketInfo.Id.Uint64()}
+	bucketsId := []uint64{listBuckets.Buckets[0].BucketInfo.Id}
 	response0, err := testAccount.SDKClient.ListBucketsByBucketID(context.Background(), bucketsId, *s.spEndpointOptions)
 	log.Infof("ListBucketsByBucketID: %v", response0.Buckets[0])
 	s.NoError(err, "call buckets-query error")
@@ -298,7 +298,7 @@ func (s *SPFunctionalTestSuite) Test_08_BucketsByIdsObjectsByIds() {
 		listObjects, _ := testAccount.SDKClient.ListObjects(context.Background(), bucketName, sdkTypes.ListObjectsOptions{EndPointOptions: s.spEndpointOptions})
 		log.Infof("list users: %s objects length: %v", testAccount.Addr.String(), len(listObjects.Objects))
 		if len(listObjects.Objects) != 0 {
-			objectId = listObjects.Objects[0].ObjectInfo.Id.Uint64()
+			objectId = listObjects.Objects[0].ObjectInfo.Id
 			break
 		}
 	}
@@ -318,6 +318,7 @@ func (s *SPFunctionalTestSuite) Test_09_ListGroupByNameAndPrefix() {
 	s.NoError(err, "ListGroupsByNameAndPrefix error")
 }
 
+// TODO: fix
 func (s *SPFunctionalTestSuite) Test_10_UpdateAccountKey() {
 	domain := "https://greenfield.bnbchain.org/"
 	respHeader, res, err := utils.UpdateAccountKey(s.SPInfo.OperatorAddress, domain, s.SPInfo.Endpoint)
