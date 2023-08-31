@@ -321,6 +321,18 @@ func (s *SPFunctionalTestSuite) Test_08_BucketsByIdsObjectsByIds() {
 	s.NotEmpty(response)
 }
 
+func (s *SPFunctionalTestSuite) Test_09_VerifySPPrice() {
+	testAccount := s.TestAcc
+	spPriceInfo, err := testAccount.SDKClient.GetStoragePrice(context.Background(), s.SPInfo.OperatorAddress)
+	s.NoError(err)
+
+	storePrice, _ := spPriceInfo.StorePrice.Float64()
+	readPrice, _ := spPriceInfo.ReadPrice.Float64()
+	log.Infof("Read price: %v, Store price: %v, freeQuota: %d", readPrice, storePrice, spPriceInfo.FreeReadQuota)
+	s.NotZero(storePrice, "Store price is 0")
+	s.NotZero(readPrice, "Read price is 0")
+}
+
 func (s *SPFunctionalTestSuite) Test_10_ListGroupByNameAndPrefix() {
 	// group name start "prefix", contain "name"
 	name := "x"
@@ -331,17 +343,6 @@ func (s *SPFunctionalTestSuite) Test_10_ListGroupByNameAndPrefix() {
 	s.NoError(err, "ListGroupsByNameAndPrefix error")
 }
 
-func (s *SPFunctionalTestSuite) Test_03_VerifySPPrice() {
-	testAccount := s.TestAcc
-	spPriceInfo, err := testAccount.SDKClient.GetStoragePrice(context.Background(), s.SPInfo.OperatorAddress)
-	s.NoError(err)
-
-	storePrice, _ := spPriceInfo.StorePrice.Float64()
-	readPrice, _ := spPriceInfo.ReadPrice.Float64()
-	log.Infof("Read price: %v, Store price: %v", readPrice, storePrice)
-	s.NotZero(storePrice, "Store price is 0")
-	s.NotZero(readPrice, "Read price is 0")
-}
 func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 	testAccount := s.TestAcc
 	bucketName := utils.GetRandomBucketName()
