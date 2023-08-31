@@ -36,6 +36,8 @@ type SPFunctionalTestSuite struct {
 
 func (s *SPFunctionalTestSuite) SetupSuite() {
 	s.BaseSuite.SetupSuite()
+	config.CfgEnv.HttpHeaders["origin"] = "https://greenfield.bnbchain.org"
+	config.CfgEnv.HttpHeaders["referer"] = "https://greenfield.bnbchain.org"
 	s.spEndpointOptions = &sdkTypes.EndPointOptions{SPAddress: s.SPInfo.OperatorAddress, Endpoint: s.SPInfo.Endpoint}
 }
 func TestSPFunctional(t *testing.T) {
@@ -44,9 +46,10 @@ func TestSPFunctional(t *testing.T) {
 
 func (s *SPFunctionalTestSuite) Test_00_SystemStatus() {
 	statusUrl := fmt.Sprintf("%s/status", s.SPInfo.Endpoint)
-	headers, statusInfo, err := utils.HttpGetWithHeaders(statusUrl, map[string]string{})
+	headers, statusInfo, err := utils.HttpGetWithHeaders(statusUrl, config.CfgEnv.HttpHeaders)
 	s.NoError(err)
 	log.Infof("statusInfo: %v", statusInfo)
+	log.Infof("headers: %v", headers)
 	s.True(utils.CheckHttpHeader(*headers, "https://greenfield.bnbchain.org", config.CfgEnv.HttpHeaders))
 	blockSyncHeight := gjson.Get(statusInfo, "status.block_syncer_info.bs_block_height").Int()
 
@@ -281,7 +284,11 @@ func (s *SPFunctionalTestSuite) Test_05_ListUserBucketObject() {
 
 func (s *SPFunctionalTestSuite) Test_06_GetNonce() {
 	userAddress := s.TestAcc.Addr.String()
-	respHeader, response, err := utils.GetNonce(userAddress, s.SPInfo.Endpoint)
+	headers := config.CfgEnv.HttpHeaders
+	headers["X-Gnfd-User-Address"] = userAddress
+	headers["X-Gnfd-App-Domain"] = "https://greenfield.bnbchain.org/"
+
+	respHeader, response, err := utils.GetNonce(s.SPInfo.Endpoint, headers)
 	log.Debugf("GetNonce response: %v", response)
 	log.Infof("respHeader: %v", respHeader)
 
@@ -377,21 +384,22 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 	log.Infof("privateUniversalEndpoint: %s", privateUniversalEndpoint)
 	time.Sleep(5 * time.Second)
 	// case 1: access universal endpoint from non-browser;
-	header := make(map[string]string)
-	respHeader, response, err := utils.HttpGetWithHeaders(publicUniversalEndpoint, header)
+	headers := config.CfgEnv.HttpHeaders
+
+	respHeader, response, err := utils.HttpGetWithHeaders(publicUniversalEndpoint, headers)
 	log.Debugf(" publicUniversalEndpoint Response is :%v, error is %v", response, err)
 	s.True(len(response) == int(fileSize))
 	s.True(utils.CheckHttpHeader(*respHeader, "https://greenfield.bnbchain.org", config.CfgEnv.HttpHeaders))
 
 	// case 2: access universal endpoint from public object
-	header["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/114.0" //
-	_, response, err = utils.HttpGetWithHeaders(publicUniversalEndpoint, header)
+	headers["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/114.0" //
+	_, response, err = utils.HttpGetWithHeaders(publicUniversalEndpoint, headers)
 	log.Debugf("publicUniversalEndpoint response: %s", response)
 	s.NoError(err)
 	s.True(!strings.Contains(response, "error"))
 
 	// case 3: access universal endpoint without auth string from browser; expect to get a build-in dapp HTML
-	_, response, err = utils.HttpGetWithHeaders(privateUniversalEndpoint, header)
+	_, response, err = utils.HttpGetWithHeaders(privateUniversalEndpoint, headers)
 	log.Debugf("access universal endpoint without auth string, from browser,  Response is :%v, error is %v", response, err)
 	s.True(strings.Contains(response, "<!doctype html><html")) // <!doctype html><html....
 
@@ -407,7 +415,7 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 
 	universalEndpointWithPersonalSig := fmt.Sprintf("%s?X-Gnfd-Expiry-Timestamp=%s&signature=%s", privateUniversalEndpoint, expiryStr, signString)
 	log.Debugf("universalEndpointWithPersonalSig is: " + universalEndpointWithPersonalSig)
-	_, response, err = utils.HttpGetWithHeaders(universalEndpointWithPersonalSig, header)
+	_, response, err = utils.HttpGetWithHeaders(universalEndpointWithPersonalSig, headers)
 	s.NoError(err, "universalEndpointWithPersonalSig error")
 	log.Debugf("access universal endpoint with auth string, from browser,  Response is :%v, error is %v", response, err)
 	s.True(len(response) == int(fileSize))

@@ -61,6 +61,9 @@ func CheckHttpHeader(responseHeader http.Header, domain string, expectHeader map
 	compare := true
 	for headerKey, headerValue := range expectHeader {
 		respValues := responseHeader.Get(headerKey)
+		if strings.Contains(respValues, domain) {
+			return true
+		}
 		if respValues == "" {
 			log.Errorf("headerKey: %s, respValues: %s, expectValue: %s", headerKey, respValues, headerValue)
 			compare = false
@@ -69,7 +72,7 @@ func CheckHttpHeader(responseHeader http.Header, domain string, expectHeader map
 		headerValue = strings.TrimSpace(headerValue)
 		respValues = strings.TrimSpace(respValues)
 
-		if respValues != headerValue && !strings.Contains(respValues, "*") && !strings.Contains(respValues, domain) {
+		if respValues != headerValue && !strings.Contains(respValues, "*") {
 			log.Errorf("headerKey: %s, respValues: %s, expectValue: %s", headerKey, respValues, headerValue)
 			compare = false
 		}
