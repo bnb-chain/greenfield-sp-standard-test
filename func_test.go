@@ -6,17 +6,21 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
 
+	sdkClient "github.com/bnb-chain/greenfield-go-sdk/client"
 	"github.com/bnb-chain/greenfield-sp-standard-test/config"
-	"github.com/consensys/gnark-crypto/ecc/bn254/fr/mimc"
 	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/suite"
 	"github.com/tidwall/gjson"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
+	httplib "github.com/bnb-chain/greenfield-common/go/http"
 	sdkTypes "github.com/bnb-chain/greenfield-go-sdk/types"
 	"github.com/bnb-chain/greenfield-sp-standard-test/core/basesuite"
 	"github.com/bnb-chain/greenfield-sp-standard-test/core/log"
@@ -32,12 +36,32 @@ type SPFunctionalTestSuite struct {
 
 func (s *SPFunctionalTestSuite) SetupSuite() {
 	s.BaseSuite.SetupSuite()
+	config.CfgEnv.HttpHeaders["origin"] = "https://greenfield.bnbchain.org"
+	config.CfgEnv.HttpHeaders["referer"] = "https://greenfield.bnbchain.org"
 	s.spEndpointOptions = &sdkTypes.EndPointOptions{SPAddress: s.SPInfo.OperatorAddress, Endpoint: s.SPInfo.Endpoint}
 }
 func TestSPFunctional(t *testing.T) {
 	suite.Run(t, new(SPFunctionalTestSuite))
 }
-func (s *SPFunctionalTestSuite) Test_00_UploadMultiSizeFile() {
+
+func (s *SPFunctionalTestSuite) Test_00_SystemStatus() {
+	statusUrl := fmt.Sprintf("%s/status", s.SPInfo.Endpoint)
+	headers, statusInfo, err := utils.HttpGetWithHeaders(statusUrl, config.CfgEnv.HttpHeaders)
+	s.NoError(err)
+	log.Infof("statusInfo: %v", statusInfo)
+	log.Infof("headers: %v", headers)
+	s.True(utils.CheckHttpHeader(*headers, "https://greenfield.bnbchain.org", config.CfgEnv.HttpHeaders))
+	blockSyncHeight := gjson.Get(statusInfo, "status.block_syncer_info.bs_block_height").Int()
+
+	testAccount := s.TestAcc
+	status, err := testAccount.SDKClient.GetStatus(context.Background())
+	s.NoError(err)
+	diff := status.SyncInfo.LatestBlockHeight - blockSyncHeight
+	log.Infof("blockSyncHeight: %v, blockChain LatestBlockHeight: %d", blockSyncHeight, status.SyncInfo.LatestBlockHeight)
+	s.True(diff < 30, "sp block sync height less block chain over 30 block")
+}
+
+func (s *SPFunctionalTestSuite) Test_01_UploadMultiSizeFile() {
 
 	testAccount := s.TestAcc
 	bucketName := utils.GetRandomBucketName()
@@ -99,7 +123,7 @@ func (s *SPFunctionalTestSuite) Test_00_UploadMultiSizeFile() {
 		})
 	}
 }
-func (s *SPFunctionalTestSuite) Test_01_DeleteObjectBucket() {
+func (s *SPFunctionalTestSuite) Test_02_DeleteObjectBucket() {
 	bucketName := utils.GetRandomBucketName()
 	objectName := utils.GetRandomObjectName()
 	fileSize := uint64(utils.RandInt64(1024, 10*1024))
@@ -148,7 +172,7 @@ func (s *SPFunctionalTestSuite) Test_01_DeleteObjectBucket() {
 	s.NoError(err)
 	s.True(deleteBucketTxInfo.TxResult.Code == 0, deleteBucketTxInfo)
 }
-func (s *SPFunctionalTestSuite) Test_02_CheckDownloadQuota() {
+func (s *SPFunctionalTestSuite) Test_03_CheckDownloadQuota() {
 	bucketName := utils.GetRandomBucketName()
 	objectName := utils.GetRandomObjectName()
 	fileSize := uint64(utils.RandInt64(1024, 10*1024))
@@ -200,17 +224,6 @@ func (s *SPFunctionalTestSuite) Test_02_CheckDownloadQuota() {
 	s.NoError(err)
 	s.True(len(quotaRecord1.ReadRecords) == 1)
 	s.Equal(fileSize, quotaRecord1.ReadRecords[0].ReadSize)
-}
-func (s *SPFunctionalTestSuite) Test_03_VerifySPPrice() {
-	testAccount := s.TestAcc
-	spPriceInfo, err := testAccount.SDKClient.GetStoragePrice(context.Background(), s.SPInfo.OperatorAddress)
-	s.NoError(err)
-
-	storePrice, _ := spPriceInfo.StorePrice.Float64()
-	readPrice, _ := spPriceInfo.ReadPrice.Float64()
-	log.Infof("Read price: %v, Store price: %v", readPrice, storePrice)
-	s.NotZero(storePrice, "Store price is 0")
-	s.NotZero(readPrice, "Read price is 0")
 }
 
 func (s *SPFunctionalTestSuite) Test_04_VerifyAuth() {
@@ -271,13 +284,19 @@ func (s *SPFunctionalTestSuite) Test_05_ListUserBucketObject() {
 
 func (s *SPFunctionalTestSuite) Test_06_GetNonce() {
 	userAddress := s.TestAcc.Addr.String()
-	respHeader, response, err := utils.GetNonce(userAddress, s.SPInfo.Endpoint)
+	headers := config.CfgEnv.HttpHeaders
+	headers["X-Gnfd-User-Address"] = userAddress
+	headers["X-Gnfd-App-Domain"] = "https://greenfield.bnbchain.org/"
+
+	respHeader, response, err := utils.GetNonce(s.SPInfo.Endpoint, headers)
 	log.Debugf("GetNonce response: %v", response)
 	log.Infof("respHeader: %v", respHeader)
 
 	s.NoError(err, "call /auth/request_nonce error")
 	s.NotEmpty(response)
-	s.True(strings.Contains(response, "next_nonce"))
+	s.True(strings.Contains(response, "NextNonce"))
+	s.True(utils.CheckHttpHeader(*respHeader, "https://greenfield.bnbchain.org", config.CfgEnv.HttpHeaders))
+
 }
 
 func (s *SPFunctionalTestSuite) Test_08_BucketsByIdsObjectsByIds() {
@@ -287,7 +306,7 @@ func (s *SPFunctionalTestSuite) Test_08_BucketsByIdsObjectsByIds() {
 	s.NotEmpty(listBuckets.Buckets)
 	log.Infof("list users: %s , buckets length: %v", testAccount.Addr.String(), len(listBuckets.Buckets))
 
-	bucketsId := []uint64{listBuckets.Buckets[0].BucketInfo.Id.Uint64()}
+	bucketsId := []uint64{listBuckets.Buckets[0].BucketInfo.Id}
 	response0, err := testAccount.SDKClient.ListBucketsByBucketID(context.Background(), bucketsId, *s.spEndpointOptions)
 	log.Infof("ListBucketsByBucketID: %v", response0.Buckets[0])
 	s.NoError(err, "call buckets-query error")
@@ -298,7 +317,7 @@ func (s *SPFunctionalTestSuite) Test_08_BucketsByIdsObjectsByIds() {
 		listObjects, _ := testAccount.SDKClient.ListObjects(context.Background(), bucketName, sdkTypes.ListObjectsOptions{EndPointOptions: s.spEndpointOptions})
 		log.Infof("list users: %s objects length: %v", testAccount.Addr.String(), len(listObjects.Objects))
 		if len(listObjects.Objects) != 0 {
-			objectId = listObjects.Objects[0].ObjectInfo.Id.Uint64()
+			objectId = listObjects.Objects[0].ObjectInfo.Id
 			break
 		}
 	}
@@ -308,7 +327,20 @@ func (s *SPFunctionalTestSuite) Test_08_BucketsByIdsObjectsByIds() {
 	s.NoError(err, "call objects-query error")
 	s.NotEmpty(response)
 }
-func (s *SPFunctionalTestSuite) Test_09_ListGroupByNameAndPrefix() {
+
+func (s *SPFunctionalTestSuite) Test_09_VerifySPPrice() {
+	testAccount := s.TestAcc
+	spPriceInfo, err := testAccount.SDKClient.GetStoragePrice(context.Background(), s.SPInfo.OperatorAddress)
+	s.NoError(err)
+
+	storePrice, _ := spPriceInfo.StorePrice.Float64()
+	readPrice, _ := spPriceInfo.ReadPrice.Float64()
+	log.Infof("Read price: %v, Store price: %v, freeQuota: %d", readPrice, storePrice, spPriceInfo.FreeReadQuota)
+	s.NotZero(storePrice, "Store price is 0")
+	s.NotZero(readPrice, "Read price is 0")
+}
+
+func (s *SPFunctionalTestSuite) Test_10_ListGroupByNameAndPrefix() {
 	// group name start "prefix", contain "name"
 	name := "x"
 	prefix := "t"
@@ -318,21 +350,12 @@ func (s *SPFunctionalTestSuite) Test_09_ListGroupByNameAndPrefix() {
 	s.NoError(err, "ListGroupsByNameAndPrefix error")
 }
 
-func (s *SPFunctionalTestSuite) Test_10_UpdateAccountKey() {
-	domain := "https://greenfield.bnbchain.org/"
-	respHeader, res, err := utils.UpdateAccountKey(s.SPInfo.OperatorAddress, domain, s.SPInfo.Endpoint)
-	s.NoError(err, "call /auth/update_key")
-	s.True(strings.Contains(res, "true"))
-	log.Infof("respHeader: %v", respHeader)
-	s.True(utils.CheckHttpHeader(*respHeader, domain, config.CfgEnv.HttpHeaders))
-}
-
 func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 	testAccount := s.TestAcc
 	bucketName := utils.GetRandomBucketName()
 	publicObjectName := utils.GetRandomObjectName()
 	privateObjectName := utils.GetRandomObjectName()
-	fileSize := uint64(utils.RandInt64(1024, 5*1024))
+	fileSize := uint64(utils.RandInt64(1024, 10*1024))
 
 	// Create bucket
 	bucketTx, err := testAccount.CreateBucket(bucketName, nil)
@@ -345,7 +368,7 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 
 	// Check if private object is sealed
 	objectInfo := testAccount.IsObjectSealed(bucketName, privateObjectName)
-	s.Require().Equal(storageTypes.OBJECT_STATUS_SEALED.String(), objectInfo.ObjectStatus.String(), "private object not sealed")
+	s.Require().Equal(storageTypes.OBJECT_STATUS_SEALED, objectInfo.ObjectStatus, "private object not sealed")
 
 	// Create and upload public object
 	err = testAccount.CreateAndUploadObject(bucketName, publicObjectName, fileSize, storageTypes.VISIBILITY_TYPE_PUBLIC_READ)
@@ -353,33 +376,30 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 
 	// Check if public object is sealed
 	objectInfo2 := testAccount.IsObjectSealed(bucketName, publicObjectName)
-	s.Require().Equal(storageTypes.OBJECT_STATUS_SEALED.String(), objectInfo2.ObjectStatus.String(), "public object not sealed")
+	s.Require().Equal(storageTypes.OBJECT_STATUS_SEALED, objectInfo2.ObjectStatus, "public object not sealed")
 
 	publicUniversalEndpoint := fmt.Sprintf("%s/view/%s/%s", s.SPInfo.Endpoint, bucketName, publicObjectName)
 	privateUniversalEndpoint := fmt.Sprintf("%s/download/%s/%s", s.SPInfo.Endpoint, bucketName, privateObjectName)
 	log.Infof("publicUniversalEndpoint: %s", publicUniversalEndpoint)
 	log.Infof("privateUniversalEndpoint: %s", privateUniversalEndpoint)
-	time.Sleep(3 * time.Second)
+	time.Sleep(5 * time.Second)
 	// case 1: access universal endpoint from non-browser;
-	header := make(map[string]string)
-	_, response, err := utils.HttpGetWithHeaders(publicUniversalEndpoint, header)
-	s.NoError(err)
-	log.Debugf(" publicUniversalEndpoint Response is :%v, error is %v", response, err)
-	s.True(len(response) == int(fileSize), response) // the response size is 1, as the upload file size is 1b
-	domain := "https://greenfield.bnbchain.org/"
-	header["origin"] = domain
-	// case 2: access universal endpoint from public object
-	header["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/114.0" //
-	respHeader, response, err := utils.HttpGetWithHeaders(publicUniversalEndpoint, header)
-	log.Debugf("respHeader: %v", respHeader)
-	s.True(utils.CheckHttpHeader(*respHeader, domain, config.CfgEnv.HttpHeaders))
+	headers := config.CfgEnv.HttpHeaders
 
+	respHeader, response, err := utils.HttpGetWithHeaders(publicUniversalEndpoint, headers)
+	log.Debugf(" publicUniversalEndpoint Response is :%v, error is %v", response, err)
+	s.True(len(response) == int(fileSize))
+	s.True(utils.CheckHttpHeader(*respHeader, "https://greenfield.bnbchain.org", config.CfgEnv.HttpHeaders))
+
+	// case 2: access universal endpoint from public object
+	headers["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/114.0" //
+	_, response, err = utils.HttpGetWithHeaders(publicUniversalEndpoint, headers)
 	log.Debugf("publicUniversalEndpoint response: %s", response)
 	s.NoError(err)
 	s.True(!strings.Contains(response, "error"))
 
 	// case 3: access universal endpoint without auth string from browser; expect to get a build-in dapp HTML
-	_, response, err = utils.HttpGetWithHeaders(privateUniversalEndpoint, header)
+	_, response, err = utils.HttpGetWithHeaders(privateUniversalEndpoint, headers)
 	log.Debugf("access universal endpoint without auth string, from browser,  Response is :%v, error is %v", response, err)
 	s.True(strings.Contains(response, "<!doctype html><html")) // <!doctype html><html....
 
@@ -392,45 +412,69 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 
 	sig, _ := s.TestAcc.KM.Sign(signedMsgHash)
 	signString := utils.ConvertToString(sig)
-	universalEndpointWithPersonalSig := fmt.Sprintf("%s?expiry=%s&signature=%s", privateUniversalEndpoint, expiryStr, signString)
+
+	universalEndpointWithPersonalSig := fmt.Sprintf("%s?X-Gnfd-Expiry-Timestamp=%s&signature=%s", privateUniversalEndpoint, expiryStr, signString)
 	log.Debugf("universalEndpointWithPersonalSig is: " + universalEndpointWithPersonalSig)
-	_, response, err = utils.HttpGetWithHeaders(universalEndpointWithPersonalSig, header)
-	log.Debugf("universalEndpointWithPersonalSig Response is :%v, error is %v", response, err)
-	s.True(len(response) == int(fileSize), response)
+	_, response, err = utils.HttpGetWithHeaders(universalEndpointWithPersonalSig, headers)
+	s.NoError(err, "universalEndpointWithPersonalSig error")
+	log.Debugf("access universal endpoint with auth string, from browser,  Response is :%v, error is %v", response, err)
+	s.True(len(response) == int(fileSize))
 
 }
-
 func (s *SPFunctionalTestSuite) Test_12_OffChainAuth() {
-	appDomain := "https://greenfield.bnbchain.org/"
-	privateKeyNew, _ := crypto.GenerateKey()
-	addressNew := crypto.PubkeyToAddress(privateKeyNew.PublicKey)
-	// 1. user browser seed string, which is the eddsa private key
-	eddsaSeed := "test_seed"
+	defaultAcct, _ := s.TestAcc.SDKClient.GetDefaultAccount()
+	offChainClient, err := sdkClient.New(config.CfgEnv.GreenfieldChainId, config.CfgEnv.GreenfieldEndpoint, sdkClient.Option{
+		DefaultAccount: defaultAcct,
+		OffChainAuthOption: &sdkClient.OffChainAuthOption{
+			Seed:                 "test_seed",
+			Domain:               "https://test.domain.com",
+			ShouldRegisterPubKey: true,
+		}, GrpcDialOption: grpc.WithTransportCredentials(insecure.NewCredentials())})
+	s.TestAcc.SDKClient = offChainClient
 
-	// 2. registerEDDSAPublicKey
-	_, requestNonceResp, err := utils.GetNonce(addressNew.Hex(), s.SPInfo.Endpoint)
+	if err != nil {
+		log.Errorf("sdk new client err: %v", err)
+		panic(err)
+	}
+
+	bucketName := utils.GetRandomBucketName()
+	objectName := utils.GetRandomObjectName()
+	fileSize := uint64(utils.RandInt64(1024, 10*1024))
+	testAccount := s.TestAcc
+
+	// Create bucket
+	bucketTx, err := testAccount.CreateBucket(bucketName, nil)
 	s.NoError(err)
-	nextNonce := gjson.Get(requestNonceResp, "next_nonce").String()
-	jsonResult, error1 := utils.RegisterEDDSAPublicKey(appDomain, s.SPInfo.Endpoint, eddsaSeed, s.SPInfo.OperatorAddress, nextNonce, addressNew, privateKeyNew)
-	s.NotEmpty(jsonResult)
-	s.True(strings.Contains(jsonResult, "true"))
-	s.NoError(error1, "call /auth/update_key")
+	log.Infof("Created bucket: %s, txHash: %s", bucketName, bucketTx)
 
-	sk, _ := utils.GenerateEddsaPrivateKey(eddsaSeed)
-	unSignedMsg := fmt.Sprintf("InvokeListBucketsAPI_%v", time.Now().Add(time.Minute*2).UnixMilli())
-	hFunc := mimc.NewMiMC()
+	// Create and upload object
+	_, res, file, err := testAccount.CreateObjectAllSize(bucketName, objectName, fileSize, nil)
+	s.NoError(err)
+	err = testAccount.PutObject(bucketName, objectName, res, *file, nil)
+	s.NoError(err)
 
-	sig, _ := sk.Sign([]byte(unSignedMsg), hFunc)
-	authString := fmt.Sprintf("OffChainAuth EDDSA,SignedMsg=%v,Signature=%v", unSignedMsg, hex.EncodeToString(sig))
+	// Check if object is sealed
+	objectInfo := testAccount.IsObjectSealed(bucketName, objectName)
+	s.Equal(storageTypes.OBJECT_STATUS_SEALED, objectInfo.ObjectStatus, "object not sealed")
+	time.Sleep(5 * time.Second)
 
-	// 3. invoke list user buckets
-	userAddress := addressNew.Hex()
-	header := make(map[string]string)
-	header["X-Gnfd-User-Address"] = userAddress
-	header["X-Gnfd-App-Domain"] = appDomain
-	header["Authorization"] = authString
-	_, response, error1 := utils.HttpGetWithHeaders(s.SPInfo.Endpoint, header)
-	log.Infof("getUserBucket Response is :%v, error is %v", response, error1)
-	s.True(strings.Contains(response, "\"buckets\":["), "response not contains buckets")
-	s.NoError(error1, "call getUserBucketError error")
+	// download file in a pre-signed way by calling getObject API
+	getObjectEndpoint := fmt.Sprintf("%s/%s/%s", s.SPInfo.Endpoint, bucketName, objectName)
+
+	ExpiryDateFormat := "2006-01-02T15:04:05Z"
+	expiryStr := time.Now().Add(time.Minute * 4).Format(ExpiryDateFormat)
+
+	getObjectEndpointWithPresignedParams := fmt.Sprintf("%s?X-Gnfd-Expiry-Timestamp=%s&X-Gnfd-User-Address=%s&X-Gnfd-App-Domain=%s", getObjectEndpoint, expiryStr, defaultAcct.GetAddress().String(), "https://test.domain.com")
+	log.Debugf("getObjectEndpointWithPreSignedParams is: " + getObjectEndpointWithPresignedParams)
+	req, err := http.NewRequest(http.MethodGet, getObjectEndpointWithPresignedParams, nil)
+	s.NoError(err, req)
+	unsignedMsg := httplib.GetMsgToSignInGNFD1AuthForPreSignedURL(req)
+	authStr := testAccount.SDKClient.OffChainAuthSign(unsignedMsg)
+	getObjectEndpointWithPresignedParams = getObjectEndpointWithPresignedParams + "&Authorization=" + url.QueryEscape(authStr)
+	log.Debugf("getObjectEndpointWithPresignedParams is %s", getObjectEndpointWithPresignedParams)
+
+	_, fileDownLoadStr, err := utils.HttpGetWithHeaders(getObjectEndpointWithPresignedParams, make(map[string]string))
+	s.NoError(err, "getObjectEndpointWithPresignedParams error")
+	log.Debugf("access getObjectEndpoint with auth preSignedURL, from browser,  Response is :%v, error is %v", fileDownLoadStr, err)
+	s.True(len(fileDownLoadStr) == int(fileSize), fileDownLoadStr)
 }
