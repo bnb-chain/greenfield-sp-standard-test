@@ -69,7 +69,7 @@ func NewAccount(greenfieldEndpoint, chainId, spAddress, secret string) *Account 
 	}
 }
 func (a *Account) SelectSP(primarySPAddr string) (*spTypes.StorageProvider, error) {
-	providers, err := a.SDKClient.ListStorageProviders(context.Background(), true)
+	providers, err := a.SDKClient.ListStorageProviders(context.Background(), false)
 	if err != nil {
 		return nil, err
 	}
