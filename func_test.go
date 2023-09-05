@@ -68,10 +68,10 @@ func (s *SPFunctionalTestSuite) Test_01_UploadMultiSizeFile() {
 	bucketTx, err := testAccount.CreateBucket(bucketName, nil)
 	s.NoError(err)
 	log.Infof("Created bucket: %s, txHash: %s", bucketName, bucketTx)
-	bucket, err := testAccount.SDKClient.BuyQuotaForBucket(context.Background(), bucketName, 2*1024*1024*1024, sdkTypes.BuyQuotaOption{})
+	bucket, err := testAccount.SDKClient.BuyQuotaForBucket(context.Background(), bucketName, 3*1024*1024*1024, sdkTypes.BuyQuotaOption{})
 	s.NoError(err, "BuyQuotaForBucket error")
 	log.Infof("BuyQuotaForBucket bucket: %s, txHash: %s", bucketName, bucket)
-
+	totalDownload := int64(0) //nolint:govet
 	testCases := []struct {
 		name     string
 		fileSize uint64
@@ -80,8 +80,8 @@ func (s *SPFunctionalTestSuite) Test_01_UploadMultiSizeFile() {
 		{"Put 5.99MB file", 5*1024*1024 + 888},
 		{"Put 16MB file", 16 * 1024 * 1024},
 		{"Put 20MB file", 20 * 1024 * 1024},
-		{"Put 256MB file", 256*1024*1024 + 12},
 		{"Put 1G file", 1 * 1024 * 1024 * 1024},
+		{"Put 256MB file", 256*1024*1024 + 12},
 	}
 
 	for _, tc := range testCases {
@@ -103,10 +103,10 @@ func (s *SPFunctionalTestSuite) Test_01_UploadMultiSizeFile() {
 			log.Infof("Downloading file - object: %s, bucket: %v", objectName, bucketName)
 			quota, err := testAccount.SDKClient.GetBucketReadQuota(context.Background(), bucketName)
 			s.NoError(err, "GetBucketReadQuota error")
-			log.Infof("file Size: %d,BuyReadQuotaSize : %d, ReadConsumedSize: %d, SPFreeReadQuotaSize: %d", file.Reader.Size(), quota.ReadQuotaSize, quota.ReadConsumedSize, quota.SPFreeReadQuotaSize)
+			log.Infof("file Size: %d,BuyReadQuotaSize : %d, ReadConsumedSize: %d, FreeConsumedSize: %d,SPFreeReadQuotaSize: %d", file.Reader.Size(), quota.ReadQuotaSize, quota.ReadConsumedSize, quota.FreeConsumedSize, quota.SPFreeReadQuotaSize)
 			fileDownLoad, info2, err := testAccount.GetObject(bucketName, objectName)
 			s.NoError(err, fmt.Sprintf("===info2: %v, info: %v ", info2, info))
-
+			totalDownload = totalDownload + file.Size
 			hashA := md5.New()
 			hashB := md5.New()
 			_, err = io.Copy(hashB, fileDownLoad)
@@ -122,6 +122,11 @@ func (s *SPFunctionalTestSuite) Test_01_UploadMultiSizeFile() {
 			s.Equal(fileHash, downloadHash, "Downloading file hash check failed")
 		})
 	}
+	time.Sleep(time.Second * 3)
+	quota, err := testAccount.SDKClient.GetBucketReadQuota(context.Background(), bucketName)
+	s.NoError(err, "GetBucketReadQuota error")
+	log.Infof("totalDownload: %d,BuyReadQuotaSize : %d, ReadConsumedSize: %d, FreeConsumedSize: %d,SPFreeReadQuotaSize: %d", totalDownload, quota.ReadQuotaSize, quota.ReadConsumedSize, quota.FreeConsumedSize, quota.SPFreeReadQuotaSize)
+
 }
 func (s *SPFunctionalTestSuite) Test_02_DeleteObjectBucket() {
 	bucketName := utils.GetRandomBucketName()
