@@ -32,12 +32,17 @@ type SPFunctionalTestSuite struct {
 	basesuite.BaseSuite
 	suite.Suite
 	spEndpointOptions *sdkTypes.EndPointOptions
+	requestHeaders    map[string]string
 }
 
 func (s *SPFunctionalTestSuite) SetupSuite() {
 	s.BaseSuite.SetupSuite()
-	config.CfgEnv.HttpHeaders["origin"] = "https://greenfield.bnbchain.org"
-	config.CfgEnv.HttpHeaders["referer"] = "https://greenfield.bnbchain.org"
+	s.requestHeaders = map[string]string{}
+	for key, value := range config.CfgEnv.HttpHeaders {
+		s.requestHeaders[key] = value
+	}
+	s.requestHeaders["origin"] = "https://greenfield.bnbchain.org"
+	s.requestHeaders["referer"] = "https://greenfield.bnbchain.org"
 	s.spEndpointOptions = &sdkTypes.EndPointOptions{SPAddress: s.SPInfo.OperatorAddress, Endpoint: s.SPInfo.Endpoint}
 }
 func TestSPFunctional(t *testing.T) {
@@ -46,7 +51,7 @@ func TestSPFunctional(t *testing.T) {
 
 func (s *SPFunctionalTestSuite) Test_00_SystemStatus() {
 	statusUrl := fmt.Sprintf("%s/status", s.SPInfo.Endpoint)
-	headers, statusInfo, err := utils.HttpGetWithHeaders(statusUrl, config.CfgEnv.HttpHeaders)
+	headers, statusInfo, err := utils.HttpGetWithHeaders(statusUrl, s.requestHeaders)
 	s.NoError(err)
 	log.Infof("statusInfo: %v", statusInfo)
 	log.Infof("headers: %v", headers)
@@ -62,7 +67,6 @@ func (s *SPFunctionalTestSuite) Test_00_SystemStatus() {
 }
 
 func (s *SPFunctionalTestSuite) Test_01_UploadMultiSizeFile() {
-
 	testAccount := s.TestAcc
 	bucketName := utils.GetRandomBucketName()
 	bucketTx, err := testAccount.CreateBucket(bucketName, nil)
@@ -289,7 +293,7 @@ func (s *SPFunctionalTestSuite) Test_05_ListUserBucketObject() {
 
 func (s *SPFunctionalTestSuite) Test_06_GetNonce() {
 	userAddress := s.TestAcc.Addr.String()
-	headers := config.CfgEnv.HttpHeaders
+	headers := s.requestHeaders
 	headers["X-Gnfd-User-Address"] = userAddress
 	headers["X-Gnfd-App-Domain"] = "https://greenfield.bnbchain.org/"
 
@@ -389,7 +393,7 @@ func (s *SPFunctionalTestSuite) Test_11_UniversalEndpoint() {
 	log.Infof("privateUniversalEndpoint: %s", privateUniversalEndpoint)
 	time.Sleep(5 * time.Second)
 	// case 1: access universal endpoint from non-browser;
-	headers := config.CfgEnv.HttpHeaders
+	headers := s.requestHeaders
 
 	respHeader, response, err := utils.HttpGetWithHeaders(publicUniversalEndpoint, headers)
 	log.Debugf(" publicUniversalEndpoint Response is :%v, error is %v", response, err)
@@ -478,8 +482,9 @@ func (s *SPFunctionalTestSuite) Test_12_OffChainAuth() {
 	getObjectEndpointWithPresignedParams = getObjectEndpointWithPresignedParams + "&Authorization=" + url.QueryEscape(authStr)
 	log.Debugf("getObjectEndpointWithPresignedParams is %s", getObjectEndpointWithPresignedParams)
 
-	_, fileDownLoadStr, err := utils.HttpGetWithHeaders(getObjectEndpointWithPresignedParams, make(map[string]string))
+	respHeaders, fileDownLoadStr, err := utils.HttpGetWithHeaders(getObjectEndpointWithPresignedParams, s.requestHeaders)
 	s.NoError(err, "getObjectEndpointWithPresignedParams error")
 	log.Debugf("access getObjectEndpoint with auth preSignedURL, from browser,  Response is :%v, error is %v", fileDownLoadStr, err)
 	s.True(len(fileDownLoadStr) == int(fileSize), fileDownLoadStr)
+	log.Debugf("respHeaders: %v", respHeaders)
 }

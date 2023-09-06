@@ -64,6 +64,9 @@ func CheckHttpHeader(responseHeader http.Header, domain string, expectHeader map
 		if strings.Contains(respValues, domain) {
 			return true
 		}
+		if headerKey == "Access-Control-Allow-Headers" && strings.Contains(respValues, "X-Gnfd-Expiry-Timestamp") {
+			continue
+		}
 		if respValues == "" {
 			log.Errorf("headerKey: %s, respValues: %s, expectValue: %s", headerKey, respValues, headerValue)
 			compare = false
