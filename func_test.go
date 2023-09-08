@@ -482,7 +482,7 @@ func (s *SPFunctionalTestSuite) Test_12_OffChainAuth() {
 	getObjectEndpointWithPresignedParams = getObjectEndpointWithPresignedParams + "&Authorization=" + url.QueryEscape(authStr)
 	log.Debugf("getObjectEndpointWithPresignedParams is %s", getObjectEndpointWithPresignedParams)
 
-	respHeaders, fileDownLoadStr, err := utils.HttpGetWithHeaders(getObjectEndpointWithPresignedParams, s.requestHeaders)
+	respHeaders, fileDownLoadStr, err := utils.HttpGetWithHeaders(getObjectEndpointWithPresignedParams, make(map[string]string))
 	s.NoError(err, "getObjectEndpointWithPresignedParams error")
 	log.Debugf("access getObjectEndpoint with auth preSignedURL, from browser,  Response is :%v, error is %v", fileDownLoadStr, err)
 	s.True(len(fileDownLoadStr) == int(fileSize), fileDownLoadStr)
