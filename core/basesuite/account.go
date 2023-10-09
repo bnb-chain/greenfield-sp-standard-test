@@ -25,7 +25,7 @@ type Account struct {
 	KM            keys.KeyManager
 	Addr          types.AccAddress
 	PrimarySPAddr string
-	SDKClient     sdkClient.Client
+	SDKClient     sdkClient.IClient
 	Ctx           context.Context
 	Secret        string
 }
@@ -90,7 +90,7 @@ func (a *Account) SelectSP(primarySPAddr string) (*spTypes.StorageProvider, erro
 }
 func (a *Account) CreateBucket(bucketName string, opts *sdkTypes.CreateBucketOptions) (string, error) {
 	if opts == nil {
-		opts = &sdkTypes.CreateBucketOptions{}
+		opts = &sdkTypes.CreateBucketOptions{ChargedQuota: 100 * 1024 * 1024}
 	}
 	bucketTx, err := a.SDKClient.CreateBucket(a.Ctx, bucketName, a.PrimarySPAddr, *opts)
 	if err != nil {
