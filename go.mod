@@ -4,9 +4,9 @@ go 1.20
 
 require (
 	cosmossdk.io/math v1.0.1
-	github.com/bnb-chain/greenfield v0.2.4
-	github.com/bnb-chain/greenfield-common/go v0.0.0-20230809025353-fd0519705054 // indirect
-	github.com/bnb-chain/greenfield-go-sdk v0.2.4
+	github.com/bnb-chain/greenfield v1.0.0
+	github.com/bnb-chain/greenfield-common/go v0.0.0-20230830120314-a54ffd6da39f
+	github.com/bnb-chain/greenfield-go-sdk v1.0.0
 	github.com/cometbft/cometbft v0.37.2 // indirect
 	github.com/cosmos/cosmos-sdk v0.47.3
 	github.com/ethereum/go-ethereum v1.10.26
@@ -23,12 +23,9 @@ require (
 )
 
 require (
-	github.com/consensys/gnark-crypto v0.7.0
 	github.com/panjf2000/ants/v2 v2.7.5
-	github.com/spaolacci/murmur3 v1.1.0
 	github.com/tidwall/gjson v1.14.4
 	go.uber.org/ratelimit v0.2.0
-	golang.org/x/crypto v0.10.0
 )
 
 require (
@@ -53,6 +50,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/cometbft/cometbft-db v0.7.0 // indirect
 	github.com/confio/ics23/go v0.9.0 // indirect
+	github.com/consensys/gnark-crypto v0.7.0 // indirect
 	github.com/cosmos/btcutil v1.0.5 // indirect
 	github.com/cosmos/cosmos-proto v1.0.0-beta.3 // indirect
 	github.com/cosmos/go-bip39 v1.0.0 // indirect
@@ -142,6 +140,7 @@ require (
 	github.com/zondax/hid v0.9.1 // indirect
 	github.com/zondax/ledger-go v0.14.1 // indirect
 	go.etcd.io/bbolt v1.3.7 // indirect
+	golang.org/x/crypto v0.10.0 // indirect
 	golang.org/x/exp v0.0.0-20230515195305-f3d0a9c9a5cc // indirect
 	golang.org/x/net v0.11.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect

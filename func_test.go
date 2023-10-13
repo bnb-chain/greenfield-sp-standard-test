@@ -279,14 +279,14 @@ func (s *SPFunctionalTestSuite) Test_04_VerifyAuth() {
 func (s *SPFunctionalTestSuite) Test_05_ListUserBucketObject() {
 	testAccount := s.TestAcc
 	// List buckets for the testAccount
-	listBuckets, err := testAccount.SDKClient.ListBuckets(context.Background(), sdkTypes.ListBucketsOptions{EndPointOptions: s.spEndpointOptions}) //
+	listBuckets, err := testAccount.SDKClient.ListBuckets(context.Background(), sdkTypes.ListBucketsOptions{Endpoint: s.spEndpointOptions.Endpoint}) //
 	s.NoError(err)
 	s.NotEmpty(listBuckets.Buckets)
 	log.Infof("List users: %s buckets: %v", testAccount.Addr.String(), listBuckets.Buckets)
 
 	// List objects for the first bucket
 	bucketName := listBuckets.Buckets[0].BucketInfo.BucketName
-	listObjects, err := testAccount.SDKClient.ListObjects(context.Background(), bucketName, sdkTypes.ListObjectsOptions{EndPointOptions: s.spEndpointOptions})
+	listObjects, err := testAccount.SDKClient.ListObjects(context.Background(), bucketName, sdkTypes.ListObjectsOptions{Endpoint: s.spEndpointOptions.Endpoint})
 	s.NoError(err)
 	log.Infof("List users: %s objects: %v", testAccount.Addr.String(), listObjects.Objects)
 }
@@ -310,7 +310,7 @@ func (s *SPFunctionalTestSuite) Test_06_GetNonce() {
 
 func (s *SPFunctionalTestSuite) Test_08_BucketsByIdsObjectsByIds() {
 	testAccount := s.TestAcc
-	listBuckets, err := testAccount.SDKClient.ListBuckets(context.Background(), sdkTypes.ListBucketsOptions{EndPointOptions: s.spEndpointOptions})
+	listBuckets, err := testAccount.SDKClient.ListBuckets(context.Background(), sdkTypes.ListBucketsOptions{Endpoint: s.spEndpointOptions.Endpoint})
 	s.NoError(err)
 	s.NotEmpty(listBuckets.Buckets)
 	log.Infof("list users: %s , buckets length: %v", testAccount.Addr.String(), len(listBuckets.Buckets))
@@ -323,7 +323,7 @@ func (s *SPFunctionalTestSuite) Test_08_BucketsByIdsObjectsByIds() {
 	objectId := uint64(0)
 	for _, bucket := range listBuckets.Buckets {
 		bucketName := bucket.BucketInfo.BucketName
-		listObjects, _ := testAccount.SDKClient.ListObjects(context.Background(), bucketName, sdkTypes.ListObjectsOptions{EndPointOptions: s.spEndpointOptions})
+		listObjects, _ := testAccount.SDKClient.ListObjects(context.Background(), bucketName, sdkTypes.ListObjectsOptions{Endpoint: s.spEndpointOptions.Endpoint})
 		log.Infof("list users: %s objects length: %v", testAccount.Addr.String(), len(listObjects.Objects))
 		if len(listObjects.Objects) != 0 {
 			objectId = listObjects.Objects[0].ObjectInfo.Id
@@ -354,7 +354,7 @@ func (s *SPFunctionalTestSuite) Test_10_ListGroupByNameAndPrefix() {
 	name := "x"
 	prefix := "t"
 	testAccount := s.TestAcc
-	listGroupByNameAndPrefix, err := testAccount.SDKClient.ListGroup(context.Background(), name, prefix, sdkTypes.ListGroupsOptions{EndPointOptions: s.spEndpointOptions})
+	listGroupByNameAndPrefix, err := testAccount.SDKClient.ListGroup(context.Background(), name, prefix, sdkTypes.ListGroupsOptions{Endpoint: s.spEndpointOptions.Endpoint})
 	log.Infof("listGroupByNameAndPrefix: %v", listGroupByNameAndPrefix)
 	s.NoError(err, "ListGroupsByNameAndPrefix error")
 }
