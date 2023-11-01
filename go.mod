@@ -172,4 +172,6 @@ replace (
 	github.com/forbole/juno/v4 => github.com/bnb-chain/juno/v4 v4.0.0-20230420110331-03f0d6934e45
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 	github.com/myzhan/boomer v1.6.1-0.20220926022709-0b030996ff8f => github.com/robertw07/boomer v0.1.9
+
+	github.com/wercker/journalhook => github.com/wercker/journalhook v0.0.0-20230927020745-64542ffa4117
 )
