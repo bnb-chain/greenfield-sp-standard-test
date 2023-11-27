@@ -305,6 +305,13 @@ func (s *SPFunctionalTestSuite) Test_06_GetNonce() {
 	s.NotEmpty(response)
 	s.True(strings.Contains(response, "NextNonce"))
 	s.True(utils.CheckHttpHeader(*respHeader, "https://greenfield.bnbchain.org", config.CfgEnv.HttpHeaders))
+	resp, _, err := utils.OptionsGetNonce(s.SPInfo.Endpoint, headers)
+	log.Infof("Options resp status code: %d", resp.StatusCode)
+	log.Infof("Options resp status: %s", resp.Status)
+	s.NoError(err, "call /auth/request_nonce error")
+	s.True(resp.StatusCode < 400, "need support options request")
+	log.Infof("respHeader: %v", resp.Header)
+	s.True(utils.CheckHttpHeader(*respHeader, "https://greenfield.bnbchain.org", config.CfgEnv.HttpHeaders))
 
 }
 
