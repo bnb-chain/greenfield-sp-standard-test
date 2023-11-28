@@ -31,6 +31,29 @@ func HttpGetWithHeaders(url string, header map[string]string) (*http.Header, str
 
 	return &resp.Header, string(body), err
 }
+
+func HttpOptionsWithHeaders(url string, header map[string]string) (*http.Response, string, error) {
+	req, err := http.NewRequest(http.MethodOptions, url, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	for key, value := range header {
+		req.Header.Set(key, value)
+	}
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if nil != resp.Body {
+		defer resp.Body.Close()
+	} else {
+		return nil, "{}", err
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return resp, string(body), err
+}
 func HttpPostWithHeaders(url string, jsonStr string, header map[string]string) (*http.Header, string, error) {
 	var json = []byte(jsonStr)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(json))

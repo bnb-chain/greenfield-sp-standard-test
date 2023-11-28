@@ -32,7 +32,7 @@ func (s *BaseSuite) SetupSuite() {
 
 	s.TestAcc = NewAccount(config.CfgEnv.GreenfieldEndpoint, config.CfgEnv.GreenfieldChainId, config.CfgEnv.SPAddr, config.CfgEnv.TestAcc)
 	// check test account balance
-	s.InitAccountsBNBBalance([]*Account{s.TestAcc}, 1e16)
+	s.InitAccountsBNBBalance([]*Account{s.TestAcc}, 3e15)
 
 	spAddr := config.CfgEnv.SPAddr
 	spInfo, err := s.TestAcc.SelectSP(spAddr)
